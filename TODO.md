@@ -1,5 +1,10 @@
 # Implementation Task History
 
+The user starts each implementation task by adding its identifier, title, and
+`Ask`. After completing and verifying that task, the implementing agent adds a
+brief `Answer` describing the work performed. Agents do not create tasks or
+rewrite user-authored asks.
+
 ## TASK-001: Add repository contributor guide
 
 **Ask:** Create a concise root-level `AGENTS.md` describing the planned project structure, commands, coding and testing conventions, contribution expectations, security rules, and the required `TODO.md` task-history process.

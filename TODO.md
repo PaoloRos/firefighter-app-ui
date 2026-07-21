@@ -2,8 +2,9 @@
 
 The user starts each implementation task by adding its identifier, title, and
 `Ask`. After completing and verifying that task, the implementing agent adds a
-brief `Answer` describing the work performed. Agents do not create tasks or
-rewrite user-authored asks.
+brief `Answer` describing the work performed. Starting with `TASK-004`, the
+agent also adds automated-test and developer-demo instructions. Agents do not
+create tasks or rewrite user-authored asks.
 
 ### TASK-001: Add repository contributor guide
 
@@ -37,3 +38,43 @@ rewrite user-authored asks.
 - local binding configuration for 127.0.0.1
 
 **Answer:** Added an installable FastAPI backend with an application factory, versioned health route and response model, project/test dependencies, pytest configuration, one health-check test, and a Uvicorn runner fixed to `127.0.0.1:8000`. Verified the editable installation, dependency consistency, independent factory instances, one passing pytest test, and a live loopback-only HTTP 200 health response.
+
+**Automated test:**
+
+1. From the repository root, run `cd backend`.
+2. If the environment is not set up yet, run `python3 -m venv .venv` and `.venv/bin/python -m pip install -e '.[test]'`.
+3. Run `.venv/bin/python -m pytest`.
+4. Confirm that the health-check test passes.
+
+**Developer demo:**
+
+1. From `backend/`, run `.venv/bin/python -m firefighter_tools_backend`.
+2. Open `http://127.0.0.1:8000/api/v1/health` in a browser and confirm that it displays `{"status":"ok"}`.
+3. Open `http://127.0.0.1:8000/docs`, expand `GET /api/v1/health`, and confirm that the endpoint can be executed successfully from the API documentation.
+4. Stop the server with `Ctrl+C`.
+
+### TASK-005 - Frontend foundation
+
+**Ask**: Create `frontend/` with:
+
+- React, TypeScript, and Vite
+- React Router
+- strict TypeScript configuration
+- Vitest and React Testing Library
+- a minimal Feuerwehr Tools shell with placeholder route
+
+**Answer:** Added a pnpm-managed React, TypeScript, and Vite frontend with React Router, strict compiler settings, Vitest and React Testing Library, a responsive German Feuerwehr Tools dashboard, and a calendar-converter placeholder route. Verified two passing route tests, the production build and type check, and HTTP 200 responses for both routes from a Vite server bound to `127.0.0.1`.
+
+**Automated test:**
+
+1. From the repository root, run `cd frontend`.
+2. If dependencies are not installed yet, run `pnpm install --frozen-lockfile`.
+3. Run `pnpm test` and confirm that both route tests pass.
+4. Run `pnpm build` and confirm that the strict TypeScript check and Vite production build complete successfully.
+
+**Developer demo:**
+
+1. From `frontend/`, run `pnpm dev`.
+2. Open `http://127.0.0.1:5173/` and confirm that the responsive German Feuerwehr Tools dashboard is visible.
+3. Follow the calendar-converter link, or open `http://127.0.0.1:5173/tools/calendar-converter`, and confirm that the placeholder route is displayed.
+4. Resize the browser window to confirm that the shell remains usable at narrow and wide widths, then stop the server with `Ctrl+C`.

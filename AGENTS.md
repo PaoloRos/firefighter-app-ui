@@ -6,17 +6,34 @@
 
 ## Task History in TODO.md
 
-The user launches project implementation tasks in `TODO.md` by writing the identifier, title, and `Ask`. Agents must not create tasks, rewrite asks, or infer work items. Keep identifiers sequential (`TASK-001`, `TASK-002`, and so on) without reuse or renumbering. Before implementation, confirm the entry exists. After verification, add only its brief `Answer`:
+The user launches project implementation tasks in `TODO.md` by writing the identifier, title, and `Ask`. Agents must not create tasks, rewrite asks, or infer work items. Keep identifiers sequential (`TASK-001`, `TASK-002`, and so on) without reuse or renumbering. Before implementation, confirm the entry exists. After verification, add its brief `Answer`.
+
+Starting with `TASK-004`, every completed task must also include two sections immediately after the answer:
+
+- `Automated test` gives the developer copy-pasteable commands and the expected successful result. Include all tests relevant to the task.
+- `Developer demo` gives the local startup commands, URLs or interactions, and the visible behavior the developer should verify manually. For backend-only work, a browser-visible endpoint or API documentation walkthrough is an acceptable visual demo.
+
+Use this format:
 
 ```markdown
-## TASK-001: Short descriptive title
+## TASK-004: Short descriptive title
 
 **Ask:** Brief user-written summary of what is requested.
 
 **Answer:** Brief agent-written summary of what was implemented, including verification.
+
+**Automated test:**
+
+1. Run `command` from the documented directory.
+2. Confirm the expected tests pass.
+
+**Developer demo:**
+
+1. Start the application locally with `command`.
+2. Open the documented local URL and confirm the expected visible behavior.
 ```
 
-Keep answers factual and synchronized with delivered work. If an implementation task is missing, ask the user to add it. User instructions may explicitly exempt agent-behavior or documentation maintenance from this process.
+Keep answers and test/demo instructions factual and synchronized with delivered work. Do not record commands that were not verified. If an implementation task is missing, ask the user to add it. User instructions may explicitly exempt agent-behavior or documentation maintenance from this process.
 
 ## Build, Test, and Development Commands
 

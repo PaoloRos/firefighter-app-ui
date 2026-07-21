@@ -101,3 +101,28 @@ create tasks or rewrite user-authored asks.
 2. Open `http://127.0.0.1:5173/api/v1/health` and confirm that the Vite-origin URL displays `{"status":"ok"}` from FastAPI without a CORS error.
 3. Optionally copy `frontend/.env.example` to the ignored `frontend/.env.local`, change `FIREFIGHTER_TOOLS_API_TARGET` to another loopback HTTP port, and restart `make dev` to use that local backend target.
 4. Press `Ctrl+C` and confirm that both development servers stop.
+
+### TASK-007 - Shared commands and verifications
+
+**Ask**: Add the initial:
+- `make setup`
+- `make dev`
+- `make test`
+- baseline `.gitignore`
+- setup documentation
+`make run` can initially be documented as forthcoming, because production frontend serving belongs to PLAN step 6.
+
+**Answer:** Added repeatable `make setup` and aggregate `make test` targets alongside the existing parallel `make dev` workflow, expanded the baseline ignore rules for local environments and generated artifacts, removed tracked TypeScript build metadata, and documented prerequisites, setup, development, testing, proxy configuration, troubleshooting, and the deferred `make run`. Verified a complete setup, one passing backend test, six passing frontend tests, ignore-rule coverage, and a live proxied health response through Vite.
+
+**Automated test:**
+
+1. From the repository root, run `make setup` and confirm that the editable backend and lockfile-pinned frontend dependencies install successfully.
+2. Run `make test` and confirm that one backend test and six frontend tests pass.
+3. Run `git diff --check` and confirm that it produces no output and exits successfully.
+
+**Developer demo:**
+
+1. From the repository root, run `make dev` and confirm that FastAPI starts on `http://127.0.0.1:8000` and Vite starts on `http://127.0.0.1:5173`.
+2. Open `http://127.0.0.1:5173` and confirm that the Feuerwehr Tools dashboard is visible.
+3. Open `http://127.0.0.1:5173/api/v1/health` and confirm that it displays `{"status":"ok"}` through the development proxy.
+4. Press `Ctrl+C` and confirm that both servers stop.

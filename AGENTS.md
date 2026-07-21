@@ -37,12 +37,12 @@ Keep answers and test/demo instructions factual and synchronized with delivered 
 
 ## Build, Test, and Development Commands
 
-The planned command contract becomes available as the application is scaffolded:
+The shared command contract is introduced as the application is scaffolded:
 
 - `make setup` installs Python and Node dependencies.
 - `make dev` runs Vite and FastAPI for development.
-- `make test` runs backend, frontend, and integration tests.
-- `make run` builds and serves the app on `127.0.0.1`.
+- `make test` runs the currently available backend and frontend test suites; integration tests join it when they are added.
+- `make run` will build and serve the app on `127.0.0.1` in PLAN step 6; it is not available yet.
 
 ## Coding Style & Testing Guidelines
 

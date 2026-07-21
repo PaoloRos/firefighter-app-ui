@@ -1,12 +1,23 @@
 .DS_Store
+.AppleDouble
+.LSOverride
+*~
+*.swp
+.idea/
+.vscode/
+
 .pnpm-store/
 /node_modules/
 
 __pycache__/
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
 *.py[cod]
 *.egg-info/
 .venv/
+.coverage
+htmlcov/
 
 .env
 .env.*
@@ -18,3 +29,10 @@ frontend/.env.*
 frontend/node_modules/
 frontend/dist/
 frontend/coverage/
+*.tsbuildinfo
+frontend/playwright-report/
+frontend/test-results/
+
+uploads/
+generated/
+*.ics

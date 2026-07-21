@@ -6,9 +6,7 @@
 
 ## Task History in TODO.md
 
-The user launches each implementation task in `TODO.md`. The user owns the identifier, title, and `Ask`; agents must not create tasks, rewrite asks, or infer new work items. Treat the file as an append-only implementation history, not a general backlog. Identifiers are sequential (`TASK-001`, `TASK-002`, and so on) and must never be reused or renumbered.
-
-Before implementing, confirm that the requested task already exists with its user-written `Ask`. After implementation and verification, the agent adds or completes only the brief `Answer`:
+The user launches project implementation tasks in `TODO.md` by writing the identifier, title, and `Ask`. Agents must not create tasks, rewrite asks, or infer work items. Keep identifiers sequential (`TASK-001`, `TASK-002`, and so on) without reuse or renumbering. Before implementation, confirm the entry exists. After verification, add only its brief `Answer`:
 
 ```markdown
 ## TASK-001: Short descriptive title
@@ -18,7 +16,7 @@ Before implementing, confirm that the requested task already exists with its use
 **Answer:** Brief agent-written summary of what was implemented, including verification.
 ```
 
-Keep the answer factual and synchronized with delivered work. If the user has not added the task to `TODO.md`, ask them to do so before implementation rather than creating the entry on their behalf.
+Keep answers factual and synchronized with delivered work. If an implementation task is missing, ask the user to add it. User instructions may explicitly exempt agent-behavior or documentation maintenance from this process.
 
 ## Build, Test, and Development Commands
 
@@ -38,5 +36,7 @@ Use pytest for FastAPI, Vitest with React Testing Library for components, and Pl
 ## Commits, Pull Requests & Security
 
 Use short imperative commit subjects, for example `Add calendar upload validation`. Pull requests should explain behavior, include test evidence, link applicable issues, mention plan or API changes, and show screenshots for UI updates.
+
+Do not pull from or publish to GitHub automatically. Never create or update remotes, pull or push branches or tags, modify pull requests, or create releases. Leave work local for review. If publication is necessary, pause before any GitHub mutation, explain why, and let the user publish manually. Read-only inspection is allowed.
 
 Enforce the 10 MiB upload limit, sanitize filenames, bind locally to `127.0.0.1`, and retain no uploaded files. Never log schedule contents or commit secrets, generated calendars, or local environment files.

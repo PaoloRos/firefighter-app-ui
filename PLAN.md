@@ -6,7 +6,7 @@ Replace `PLANS.md` entirely with a decision-complete plan for a local, bilingual
 
 The MVP will:
 
-- Run only on `127.0.0.1`.
+- Run only on `127.0.0.1` (`localhost`), so the application is accessible from this computer but not from other devices on the local network or the public internet.
 - Support desktop and responsive mobile layouts.
 - Use German by default, with an Italian language switch.
 - Present a tool dashboard prepared for future programs.
@@ -75,7 +75,7 @@ convert_schedule(
 
 `ConversionResult` exposes ICS text, total/converted/skipped counts, and invalid events. Each invalid event includes its source position, ID, summary, and structured issue codes. Fatal input errors expose a stable code plus optional row and worksheet locations.
 
-Preserve the converter’s existing CLI behavior and exit codes by making the CLI call this new service. Pin the backend to the resulting calendar-conversion release or Git tag; allow an editable sibling checkout during development.
+Preserve the converter’s existing CLI behavior and exit codes by making the CLI call this new service. Pin the backend to the `calendar-conversion` `v0.2.0` Git tag; allow an editable sibling checkout during development.
 
 ### Web API
 

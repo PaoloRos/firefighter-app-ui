@@ -145,6 +145,7 @@ def test_fatal_error_contract_has_a_stable_code_and_safe_message(
 
 def test_fatal_error_code_values_are_stable() -> None:
     assert [code.value for code in FatalErrorCode] == [
+        "missing_filename",
         "unsupported_file_type",
         "oversized_upload",
         "malformed_csv",

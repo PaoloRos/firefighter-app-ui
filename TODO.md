@@ -185,3 +185,28 @@ The adapter should:
 1. From the repository root, run `backend/.venv/bin/python -c 'from io import BytesIO; from firefighter_tools_backend.adapters import convert_schedule; data=b"id,summary,all_date,start_date,start_time,end_date,end_time,location,description\nexercise,Exercise,true,2026-07-22,,2026-07-22,,,\n"; result=convert_schedule(BytesIO(data), filename="schedule.csv", calendar_name="Feuerwehr"); print(result.total_count, result.converted_count, result.skipped_count, type(result).__module__)'`.
 2. Confirm that it prints `1 1 0 firefighter_tools_backend.domain.calendar_conversion`, demonstrating in-memory conversion into backend-owned data without an HTTP route.
 
+### TASK-010 - Implement upload validation
+
+Validate in this order:
+  - Ensure a filename is present.
+  - Sanitize it by removing directory components.
+  - Accept only `.csv` and `.xlsx`.
+  - Read in chunks while enforcing the 10 MiB limit.
+  - Stop immediately if the limit is exceeded.
+  - Close the uploaded file in a `finally` block.
+
+The file may exist temporarily inside the request machinery, but the application must never save it to a permanent path. Schedule contents and generated ICS text must not be logged.
+
+**Answer:** Added an asynchronous upload-validation service with typed backend-domain results and errors. It checks and sanitizes filenames before extension validation, accepts case-insensitive CSV/XLSX names, reads into memory in bounded chunks, accepts exactly 10 MiB, stops after the first excess byte, translates read failures, and always closes the request upload. Added a stable `missing_filename` API error code without adding a route, filesystem persistence, or content logging.
+
+**Automated test:**
+
+1. From the repository root, run `backend/.venv/bin/python -m pytest backend/tests/test_upload_validation.py -vv` and confirm that all 15 focused upload-validation tests pass.
+2. Run `make test` and confirm that 42 backend tests and six frontend tests pass.
+3. Run `backend/.venv/bin/python -m pip check` and confirm that it reports `No broken requirements found.`
+4. Run `git diff --check` and confirm that it produces no output and exits successfully.
+
+**Developer demo:**
+
+1. From the repository root, run `backend/.venv/bin/python -c 'import asyncio; from io import BytesIO; from starlette.datastructures import UploadFile; from firefighter_tools_backend.services import validate_upload; upload=UploadFile(filename="../../schedule.CSV", file=BytesIO(b"schedule")); result=asyncio.run(validate_upload(upload)); print(result.filename, result.size, result.source.read(), upload.file.closed)'`.
+2. Confirm that it prints `schedule.CSV 8 b'schedule' True`, demonstrating directory removal, in-memory data, and closure of the request upload.

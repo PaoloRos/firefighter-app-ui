@@ -25,6 +25,7 @@ class ConversionStatus(StrEnum):
 class FatalErrorCode(StrEnum):
     """Stable frontend-facing code for a request-level failure."""
 
+    MISSING_FILENAME = "missing_filename"
     UNSUPPORTED_FILE_TYPE = "unsupported_file_type"
     OVERSIZED_UPLOAD = "oversized_upload"
     MALFORMED_CSV = "malformed_csv"

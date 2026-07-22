@@ -8,6 +8,11 @@ from firefighter_tools_backend.domain.calendar_conversion import (
     IssueCode,
     SourcePosition,
 )
+from firefighter_tools_backend.domain.upload import (
+    UploadValidationError,
+    UploadValidationErrorCode,
+    ValidatedUpload,
+)
 
 __all__ = [
     "ConversionError",
@@ -16,4 +21,7 @@ __all__ = [
     "InvalidEvent",
     "IssueCode",
     "SourcePosition",
+    "UploadValidationError",
+    "UploadValidationErrorCode",
+    "ValidatedUpload",
 ]

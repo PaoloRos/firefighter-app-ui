@@ -210,3 +210,31 @@ The file may exist temporarily inside the request machinery, but the application
 
 1. From the repository root, run `backend/.venv/bin/python -c 'import asyncio; from io import BytesIO; from starlette.datastructures import UploadFile; from firefighter_tools_backend.services import validate_upload; upload=UploadFile(filename="../../schedule.CSV", file=BytesIO(b"schedule")); result=asyncio.run(validate_upload(upload)); print(result.filename, result.size, result.source.read(), upload.file.closed)'`.
 2. Confirm that it prints `schedule.CSV 8 b'schedule' True`, demonstrating directory removal, in-memory data, and closure of the request upload.
+
+### TASK-011 - Implement the endpoint
+
+Add:
+```
+POST /api/v1/tools/calendar-converter/convert
+```
+  - The route should be thin:
+  - Validate and read the upload.
+  - Call the backend conversion service.
+  - Map the result to the declared response model.
+  - Map expected errors to `413`, `415`, or `422`.
+  - Map unexpected errors to a generic `500`.
+
+**Answer:** Added the versioned multipart conversion endpoint, a backend conversion service over the existing adapter, and the required multipart dependency. The thin route validates and closes uploads through the upload service, converts only in-memory data, maps complete/partial/all-invalid results to the declared models, returns stable safe `413`/`415`/`422` errors, and hides unexpected details behind a generic `500`. No schedule or ICS content is logged or persisted.
+
+**Automated test:**
+
+1. From the repository root, run `backend/.venv/bin/python -m pytest backend/tests/test_calendar_converter_endpoint.py -vv` and confirm that all ten endpoint contract tests pass.
+2. Run `make test` and confirm that 52 backend tests and six frontend tests pass.
+3. Run `backend/.venv/bin/python -m pip check` and confirm that it reports `No broken requirements found.`
+4. Run `git diff --check` and confirm that it produces no output and exits successfully.
+
+**Developer demo:**
+
+1. From the repository root, run `backend/.venv/bin/python -m firefighter_tools_backend` and confirm that Uvicorn reports `http://127.0.0.1:8000`.
+2. In another terminal, run `printf '%s\n' 'id,summary,all_date,start_date,start_time,end_date,end_time,location,description' 'event-1,Exercise,true,2026-07-22,,2026-07-22,,,' | curl -sS -F 'file=@-;filename=schedule.csv;type=text/csv' http://127.0.0.1:8000/api/v1/tools/calendar-converter/convert`.
+3. Confirm that the JSON has `status` set to `success`, counts `1`, `1`, and `0`, calendar filename `schedule.ics`, and ICS text containing `UID:event-1`; then stop the server with `Ctrl+C`.

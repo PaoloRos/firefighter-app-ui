@@ -5,6 +5,8 @@ from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from firefighter_tools_backend.domain.calendar_conversion import IssueCode
+
 
 class ContractModel(BaseModel):
     """Base model that rejects fields outside the documented API contract."""
@@ -18,16 +20,6 @@ class ConversionStatus(StrEnum):
     SUCCESS = "success"
     PARTIAL = "partial"
     FAILURE = "failure"
-
-
-class IssueCode(StrEnum):
-    """Stable frontend-facing code for one invalid event property."""
-
-    EMPTY_ID = "empty_id"
-    EMPTY_SUMMARY = "empty_summary"
-    END_DATE_BEFORE_START_DATE = "end_date_before_start_date"
-    END_TIME_BEFORE_START_TIME = "end_time_before_start_time"
-    DUPLICATE_ID = "duplicate_id"
 
 
 class FatalErrorCode(StrEnum):

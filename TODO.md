@@ -157,3 +157,31 @@ Important distinction:
 
 1. From the repository root, run `backend/.venv/bin/python -c 'from firefighter_tools_backend.models import FatalErrorResponse; print(FatalErrorResponse(code="unsupported_file_type", message="Only CSV and XLSX files are supported.").model_dump_json(indent=2))'`.
 2. Confirm that the visible JSON contains only the stable code `unsupported_file_type` and the safe message. The HTTP route and its API-documentation demo remain intentionally deferred to the route task.
+
+### TASK-009 - Add the converter adapter
+
+Keep calendar-conversion outside the FastAPI route:
+```
+HTTP route → backend service → converter adapter → calendar-conversion
+```
+The adapter should:
+  - Call `convert_schedule(...)`.
+  - Accept an in-memory binary stream.
+  - Translate `ConversionResult` into backend-domain data.
+  - Translate `ConversionErrorCode` without parsing CLI output.
+  - Contain no FastAPI-specific response handling.
+
+**Answer:** Added a FastAPI-free calendar-conversion adapter that accepts binary streams, calls the public `convert_schedule` service, and explicitly translates results, semantic issue codes, fatal codes, and source locations into immutable backend-domain types. Pinned the runtime dependency to the `v0.2.0` Git tag and verified its installed commit, without adding route or HTTP behavior.
+
+**Automated test:**
+
+1. From the repository root, run `make setup` and confirm that the backend installs `calendar-conversion` from Git revision `v0.2.0` and the frontend dependencies remain current.
+2. Run `make test` and confirm that 26 backend tests and six frontend tests pass.
+3. Run `backend/.venv/bin/python -m pip check` and confirm that it reports `No broken requirements found.`
+4. Run `git diff --check` and confirm that it produces no output and exits successfully.
+
+**Developer demo:**
+
+1. From the repository root, run `backend/.venv/bin/python -c 'from io import BytesIO; from firefighter_tools_backend.adapters import convert_schedule; data=b"id,summary,all_date,start_date,start_time,end_date,end_time,location,description\nexercise,Exercise,true,2026-07-22,,2026-07-22,,,\n"; result=convert_schedule(BytesIO(data), filename="schedule.csv", calendar_name="Feuerwehr"); print(result.total_count, result.converted_count, result.skipped_count, type(result).__module__)'`.
+2. Confirm that it prints `1 1 0 firefighter_tools_backend.domain.calendar_conversion`, demonstrating in-memory conversion into backend-owned data without an HTTP route.
+

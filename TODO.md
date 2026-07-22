@@ -126,3 +126,34 @@ create tasks or rewrite user-authored asks.
 2. Open `http://127.0.0.1:5173` and confirm that the Feuerwehr Tools dashboard is visible.
 3. Open `http://127.0.0.1:5173/api/v1/health` and confirm that it displays `{"status":"ok"}` through the development proxy.
 4. Press `Ctrl+C` and confirm that both servers stop.
+
+## Step 3 of implementation workflow
+
+### TASK-008 - Define the API contract
+
+**Ask**: Create Pydantic response models before writing the route:
+- `status`: `success`, `partial`, or `failure`
+- total, converted, and skipped counts
+- invalid-event details and stable issue codes
+- nullable calendar containing filename, MIME type, and ICS text
+- stable fatal-error response containing a code and safe message
+
+Important distinction:
+- All semantically invalid events: normal response with `status: "failure"` and no calendar.
+- Structurally malformed input: HTTP `422`.
+- Unsupported extension: HTTP `415`.
+- Oversized upload: HTTP `413`.
+- Unexpected internal problem: safe HTTP `500`.
+
+**Answer:** Added strict Pydantic models for conversion statuses, counts, source-located invalid events, converter-aligned issue codes, nullable in-memory calendars, and safe fatal errors. Enforced consistent count/status/calendar combinations, including a normal all-invalid `failure` response without a calendar, and verified the contract without adding the conversion route.
+
+**Automated test:**
+
+1. From the repository root, run `make test`.
+2. Confirm that 19 backend tests and six frontend tests pass.
+3. Run `git diff --check` and confirm that it produces no output and exits successfully.
+
+**Developer demo:**
+
+1. From the repository root, run `backend/.venv/bin/python -c 'from firefighter_tools_backend.models import FatalErrorResponse; print(FatalErrorResponse(code="unsupported_file_type", message="Only CSV and XLSX files are supported.").model_dump_json(indent=2))'`.
+2. Confirm that the visible JSON contains only the stable code `unsupported_file_type` and the safe message. The HTTP route and its API-documentation demo remain intentionally deferred to the route task.

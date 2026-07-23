@@ -163,4 +163,3 @@ flowchart TD
 - Internet publication is a separate phase requiring explicit decisions about hosting, authentication, authorization, TLS, rate limiting, privacy, monitoring, retention, and deployment.
 - Additional programs will follow the dashboard-card pattern and receive their own versioned API routes and backend adapters.
 - Offline/PWA support, browser-based schedule editing, event preview, and local-network access are outside the MVP.
-

@@ -6,7 +6,7 @@
 
 ## Task History in TODO.md
 
-The user launches project implementation tasks in `TODO.md` by writing the identifier, title, and `Ask`. Agents must not create tasks, rewrite asks, or infer work items. However, when confirmed by the user, insert a new task depending on the prompted instructions, by respecting the following rules about the tsks and the `SKILL.md` about the repetitive work of pasting. Keep identifiers sequential (`TASK-001`, `TASK-002`, and so on) without reuse or renumbering. Before implementation, confirm the entry exists. After verification, add its brief `Answer`.
+The user launches project implementation tasks in `TODO.md` by writing the identifier, title, and `Ask`. Agents must not create tasks, rewrite asks, or infer work items. Keep identifiers sequential (`TASK-001`, `TASK-002`, and so on) without reuse or renumbering. Before implementation, confirm the entry exists. After verification, add its brief `Answer`.
 
 Starting with `TASK-004`, every completed task must also include two sections immediately after the answer:
 
@@ -35,6 +35,7 @@ Use this format:
 
 Keep answers and test/demo instructions factual and synchronized with delivered work. Do not record commands that were not verified. If an implementation task is missing, ask the user to add it. User instructions may explicitly exempt agent-behavior or documentation maintenance from this process.
 
+Finally, **when confirmed by the user**, insert a new task depending on the prompted instructions, by respecting the previous rules about the tasks, and then start to work on him. Follow the instructions in `SKILL.md` for this repetitive task.
 ## Build, Test, and Development Commands
 
 The shared command contract is introduced as the application is scaffolded:

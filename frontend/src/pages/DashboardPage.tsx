@@ -1,26 +1,36 @@
-import { Link } from "react-router-dom";
+import { ToolCard } from "../components/ToolCard";
+import { useI18n } from "../i18n/I18nProvider";
 
 export function DashboardPage() {
+  const { t } = useI18n();
+  const tools = [
+    {
+      id: "calendar-converter",
+      category: t("calendarEyebrow"),
+      title: t("calendarTitle"),
+      description: t("calendarDescription"),
+      formatsLabel: t("calendarAcceptedFormats"),
+      formats: ["CSV", "XLSX"],
+      actionLabel: t("calendarOpen"),
+      to: "/tools/calendar-converter",
+    },
+  ] as const;
+
   return (
     <>
       <section className="hero" aria-labelledby="dashboard-title">
-        <p className="eyebrow">Einsatzbereit im Alltag</p>
-        <h1 id="dashboard-title">Werkzeuge für die Feuerwehr</h1>
-        <p>Praktische Hilfsmittel für wiederkehrende Aufgaben – sicher und lokal auf diesem Gerät.</p>
+        <p className="eyebrow">{t("dashboardEyebrow")}</p>
+        <h1 id="dashboard-title">{t("dashboardTitle")}</h1>
+        <p>{t("dashboardDescription")}</p>
       </section>
 
       <section aria-labelledby="tools-title">
-        <h2 id="tools-title">Verfügbare Werkzeuge</h2>
-        <article className="tool-card">
-          <div>
-            <p className="eyebrow">Kalender</p>
-            <h3>Dienstplan konvertieren</h3>
-            <p>CSV- oder XLSX-Dienstpläne für den Import in eine Kalender-App vorbereiten.</p>
-          </div>
-          <Link className="button-link" to="/tools/calendar-converter">
-            Werkzeug öffnen
-          </Link>
-        </article>
+        <h2 id="tools-title">{t("dashboardToolsTitle")}</h2>
+        <div className="tools-grid">
+          {tools.map((tool) => (
+            <ToolCard key={tool.id} {...tool} />
+          ))}
+        </div>
       </section>
     </>
   );

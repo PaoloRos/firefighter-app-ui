@@ -321,3 +321,100 @@ Add API tests for:
 1. From the repository root, run `backend/.venv/bin/python -c 'from importlib.metadata import version; from firefighter_tools_backend.adapters.calendar_conversion import library_convert_schedule; print(version("calendar-conversion"), library_convert_schedule.__module__)'`.
 2. Confirm that it prints `0.2.0 calendar_conversion.service`, demonstrating the tagged typed-service boundary rather than the converter CLI.
 3. Run `backend/.venv/bin/python -m pytest backend/tests/test_calendar_converter_boundaries.py -vv` and confirm that the six named checks visibly cover valid-only ICS, no all-invalid calendar, redaction, and no retained files.
+
+## Step 4 of the implementation workflow
+
+### TASK-015 - Add German and Italian translation infrastructure
+
+**Ask**: Add the translation foundation:
+
+- Create German and Italian dictionaries with identical keys.
+- Use German as the default language.
+- Add a German/Italian language switch to the header.
+- Persist a language in `localStorage` only after the user explicitly selects it.
+- Add translation helpers for visible text, API error codes, and converter issue codes.
+- Add a test that fails if the dictionary keys differ.
+- Move the existing hard-coded German shell text into the dictionaries.
+- Keep `Feuerwehr Tools` unchanged in both languages.
+
+**Answer:** Added a project-owned, type-checked German/Italian translation layer, moved all existing shell and page text into matching dictionaries, and added frontend helpers for stable API error and converter issue codes. The app now defaults to German without writing an implicit preference, offers a responsive header language switch, persists only an explicit selection, restores it on reload, updates the document language, and keeps `Feuerwehr Tools` unchanged. Verified nine focused translation/UI tests, 70 backend and 13 frontend tests, the production build, dependency consistency, clean diff checks, and the bilingual workflow in the live local app without browser errors.
+
+**Automated test:**
+
+1. From the repository root, run `cd frontend && ./node_modules/.bin/vitest run src/App.test.tsx src/i18n/translations.test.ts` and confirm that all nine focused translation and UI tests pass.
+2. From `frontend/`, run `./node_modules/.bin/tsc -b && ./node_modules/.bin/vite build` and confirm that strict TypeScript checking and the production build complete successfully.
+3. Return to the repository root, run `make test`, and confirm that 70 backend tests and 13 frontend tests pass.
+4. Run `backend/.venv/bin/python -m pip check` and confirm that it reports `No broken requirements found.`
+5. Run `git diff --check` and confirm that it produces no output and exits successfully.
+
+**Developer demo:**
+
+1. From the repository root, run `make dev` and open `http://127.0.0.1:5173/`.
+2. Confirm that the dashboard initially appears in German, `Deutsch` is selected, and the brand reads `Feuerwehr Tools`.
+3. Select `Italiano` and confirm that the header, dashboard, tool card, and footer change to Italian while the brand remains `Feuerwehr Tools`.
+4. Reload the page and confirm that Italian remains selected.
+5. Open `http://127.0.0.1:5173/tools/calendar-converter` and confirm that the placeholder page and navigation are in Italian.
+6. Stop both development servers with `Ctrl+C`.
+
+### TASK-016 - Add the typed calendar-converter API client
+
+**Ask**: Add a typed API client that:
+
+- Defines TypeScript types matching the existing Pydantic conversion contract.
+- Submits one `FormData` field named `file`.
+- Calls `POST /api/v1/tools/calendar-converter/convert`.
+- Distinguishes successful conversion responses from structured API errors.
+- Avoids interpreting human-readable backend messages.
+- Exposes stable error and converter issue codes for frontend translation.
+- Contains no rendering or browser-download logic.
+
+**Answer:** Added a standalone typed calendar-converter API client with TypeScript models matching the Pydantic success, partial, all-invalid, source-location, calendar, and fatal-error contracts. It posts exactly one `file` field to the versioned endpoint, returns a discriminated success/error result, exposes stable API and issue-code types to the translation layer, supports cancellation, and validates untrusted JSON and contract invariants at runtime without interpreting backend message text. Added no rendering or download behavior. Verified eight focused client tests, 70 backend and 21 frontend tests, the production build, dependency consistency, clean diff checks, and a live successful XLSX conversion through the Vite proxy.
+
+**Automated test:**
+
+1. From the repository root, run `cd frontend && ./node_modules/.bin/vitest run src/api/calendarConverter.test.ts` and confirm that all eight API-client tests pass.
+2. From `frontend/`, run `./node_modules/.bin/tsc -b && ./node_modules/.bin/vite build` and confirm that strict TypeScript checking and the production build complete successfully.
+3. Return to the repository root, run `make test`, and confirm that 70 backend tests and 21 frontend tests pass.
+4. Run `backend/.venv/bin/python -m pip check` and confirm that it reports `No broken requirements found.`
+5. Run `git diff --check` and confirm that it produces no output and exits successfully.
+
+**Developer demo:**
+
+1. From the repository root, run `make dev`.
+2. In another terminal, run `curl -sS -o /tmp/firefighter-task016-response.json -w 'HTTP %{http_code}\n' -F 'file=@assets/examples/calendar_schedule_example.xlsx;type=application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' http://127.0.0.1:5173/api/v1/tools/calendar-converter/convert`.
+3. Confirm that it prints `HTTP 200`.
+4. Run `backend/.venv/bin/python -c 'import json; p=json.load(open("/tmp/firefighter-task016-response.json", encoding="utf-8")); print({"status": p["status"], "counts": [p["total_count"], p["converted_count"], p["skipped_count"]], "filename": p["calendar"]["filename"], "mime_type": p["calendar"]["mime_type"], "has_ics": "BEGIN:VCALENDAR" in p["calendar"]["ics_text"]})'`.
+5. Confirm that it prints a successful result with counts `[3, 3, 0]`, filename `calendar_schedule_example.ics`, MIME type `text/calendar;charset=utf-8`, and `has_ics: True`.
+6. Run `rm /tmp/firefighter-task016-response.json`, then stop both development servers with `Ctrl+C`.
+
+### TASK-017 - Complete the translated tool dashboard
+
+**Ask**: Complete the dashboard with:
+
+- A reusable tool-card structure.
+- One calendar-converter card.
+- Translated title, description, accepted formats, and action label.
+- Navigation to `/tools/calendar-converter`.
+- A layout that can accept additional tool cards later.
+- Basic narrow- and wide-screen behavior.
+
+Detailed colors, spacing refinement, focus styling, and WCAG review remain in step 5.
+
+**Answer:** Added a reusable typed `ToolCard` component and changed the dashboard to render its tool collection through a responsive grid that can accept additional cards. The calendar-converter card now exposes translated category, title, description, accepted-format label, CSV/XLSX format badges, and action text while preserving navigation to the converter route. Kept detailed design and accessibility refinement for step 5. Verified six focused dashboard/dictionary tests, 70 backend and 23 frontend tests, the production build, dependency consistency, clean diff checks, and the German/Italian dashboard at 1200×800 and 375×812 without overflow or browser errors.
+
+**Automated test:**
+
+1. From the repository root, run `cd frontend && ./node_modules/.bin/vitest run src/pages/DashboardPage.test.tsx src/i18n/translations.test.ts` and confirm that all six focused dashboard and dictionary tests pass.
+2. From `frontend/`, run `./node_modules/.bin/tsc -b && ./node_modules/.bin/vite build` and confirm that strict TypeScript checking and the production build complete successfully.
+3. Return to the repository root, run `make test`, and confirm that 70 backend tests and 23 frontend tests pass.
+4. Run `backend/.venv/bin/python -m pip check` and confirm that it reports `No broken requirements found.`
+5. Run `git diff --check` and confirm that it produces no output and exits successfully.
+
+**Developer demo:**
+
+1. From the repository root, run `make dev` and open `http://127.0.0.1:5173/`.
+2. Confirm that the German dashboard contains one calendar-converter card with its description, `Akzeptierte Formate`, CSV/XLSX badges, and `Werkzeug öffnen` action.
+3. Select `Italiano` and confirm that the same card displays `Formati accettati` and `Apri lo strumento`.
+4. Resize the browser between a phone-sized width around 375 px and a desktop width around 1200 px; confirm that the header and card remain within the page without horizontal scrolling.
+5. Select the card action and confirm that it opens `http://127.0.0.1:5173/tools/calendar-converter`.
+6. Stop both development servers with `Ctrl+C`.

@@ -24,7 +24,7 @@ describe("App routing", () => {
     );
   });
 
-  it("shows the calendar converter placeholder route", () => {
+  it("shows the calendar converter upload route", () => {
     render(
       <MemoryRouter initialEntries={["/tools/calendar-converter"]}>
         <App />
@@ -32,7 +32,10 @@ describe("App routing", () => {
     );
 
     expect(screen.getByRole("heading", { level: 1, name: "Dienstplan konvertieren" })).toBeVisible();
-    expect(screen.getByText(/wird in einem der nächsten Schritte eingerichtet/)).toBeVisible();
+    expect(screen.getByLabelText("Datei auswählen")).toHaveAttribute(
+      "accept",
+      ".csv,.xlsx",
+    );
   });
 
   it("defaults to German without persisting an implicit choice", () => {
@@ -75,7 +78,7 @@ describe("App routing", () => {
     );
 
     expect(screen.getByRole("heading", { level: 1, name: "Converti il piano dei turni" })).toBeVisible();
-    expect(screen.getByText(/sarà configurato in uno dei prossimi passaggi/)).toBeVisible();
+    expect(screen.getByLabelText("Scegli un file")).toBeVisible();
     expect(screen.getByRole("link", { name: "Torna alla panoramica" })).toBeVisible();
   });
 });

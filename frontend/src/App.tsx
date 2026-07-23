@@ -1,7 +1,7 @@
 import { Link, NavLink, Route, Routes } from "react-router-dom";
 
 import { I18nProvider, useI18n } from "./i18n/I18nProvider";
-import { CalendarConverterPlaceholderPage } from "./pages/CalendarConverterPlaceholderPage";
+import { CalendarConverterPage } from "./pages/CalendarConverterPage";
 import { DashboardPage } from "./pages/DashboardPage";
 
 function NotFoundPage() {
@@ -69,7 +69,7 @@ function AppContent() {
       <main className="page-content">
         <Routes>
           <Route path="/" element={<DashboardPage />} />
-          <Route path="/tools/calendar-converter" element={<CalendarConverterPlaceholderPage />} />
+          <Route path="/tools/calendar-converter" element={<CalendarConverterPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </main>

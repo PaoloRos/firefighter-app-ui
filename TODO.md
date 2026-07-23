@@ -418,3 +418,39 @@ Detailed colors, spacing refinement, focus styling, and WCAG review remain in st
 4. Resize the browser between a phone-sized width around 375 px and a desktop width around 1200 px; confirm that the header and card remain within the page without horizontal scrolling.
 5. Select the card action and confirm that it opens `http://127.0.0.1:5173/tools/calendar-converter`.
 6. Stop both development servers with `Ctrl+C`.
+
+### TASK-018 - Build the converter upload workflow
+
+**Ask**: Replace the converter placeholder with a functional upload interaction:
+
+- Add a file picker accepting `.csv` and `.xlsx`.
+- Support drag-and-drop through the same selection and validation path.
+- Validate the filename extension in the browser for immediate feedback.
+- Display the selected filename.
+- Provide choose-another-file and reset actions.
+- Disable submission when no valid file is selected.
+- Prevent duplicate submissions while conversion is running.
+
+The backend remains authoritative for file type, structure, and the 10 MiB limit.
+
+**Answer:** Replaced the converter placeholder with a bilingual upload workflow that accepts CSV/XLSX selection through the picker or drag-and-drop, validates filename extensions immediately, displays the selected filename, and provides choose-another-file and reset controls. The form calls the existing typed conversion client, remains disabled without a valid file, and locks submission, file selection, and reset while a request is running. Detailed conversion results and calendar download remain deferred to the next workflow task; backend validation remains authoritative. Verified 15 focused route, translation, and workflow tests, 70 backend and 29 frontend tests, strict TypeScript checking, the production build, dependency consistency, clean diff checks, and the German/Italian page at desktop and narrow widths without overflow or browser errors.
+
+**Automated test:**
+
+1. From the repository root, run `cd frontend && ./node_modules/.bin/vitest run src/pages/CalendarConverterPage.test.tsx src/App.test.tsx src/i18n/translations.test.ts` and confirm that all 15 focused workflow, route, and translation tests pass.
+2. From `frontend/`, run `./node_modules/.bin/tsc -b` and confirm that strict TypeScript checking completes successfully.
+3. Still in `frontend/`, run `./node_modules/.bin/vite build` and confirm that the production build completes successfully.
+4. Return to the repository root, run `make test`, and confirm that 70 backend tests and 29 frontend tests pass.
+5. Run `backend/.venv/bin/python -m pip check` and confirm that it reports `No broken requirements found.`
+6. Run `git diff --check` and confirm that it produces no output and exits successfully.
+
+**Developer demo:**
+
+1. From the repository root, run `make dev` and open `http://127.0.0.1:5173/tools/calendar-converter`.
+2. Confirm that the German page shows a CSV/XLSX picker and drop zone, with `Konvertierung starten` and `Zurücksetzen` disabled initially.
+3. Choose `assets/examples/calendar_schedule_example.xlsx` and confirm that its filename appears, `Andere Datei auswählen` is available, and conversion and reset become enabled.
+4. Start the conversion and confirm that the action changes to `Wird konvertiert …` while submission, file replacement, and reset remain unavailable until the request finishes.
+5. Reset the workflow, drag a CSV or XLSX file onto the drop zone, and confirm that the same filename and action state appear. Drop a file with another extension and confirm that immediate translated validation is shown while conversion remains disabled.
+6. Select `Italiano` and confirm that the upload instructions, validation, buttons, and status text switch to Italian.
+7. Resize the browser to a phone-sized width around 375 px and confirm that the controls stack without horizontal scrolling.
+8. Stop both development servers with `Ctrl+C`.

@@ -27,8 +27,23 @@ export const germanTranslations = {
     "CSV- oder XLSX-Dienstpläne für den Import in eine Kalender-App vorbereiten.",
   calendarAcceptedFormats: "Akzeptierte Formate",
   calendarOpen: "Werkzeug öffnen",
-  calendarPlaceholder:
-    "Der Kalender-Konverter wird in einem der nächsten Schritte eingerichtet.",
+  calendarUploadIntro:
+    "Wählen Sie einen Dienstplan aus und starten Sie die sichere lokale Konvertierung.",
+  calendarDropTitle: "Dienstplan hier ablegen",
+  calendarDropHint: "Oder wählen Sie eine Datei auf diesem Gerät aus.",
+  calendarChooseFile: "Datei auswählen",
+  calendarChooseAnother: "Andere Datei auswählen",
+  calendarFileRequirements: "Akzeptiert werden CSV- und XLSX-Dateien.",
+  calendarInvalidExtension:
+    "Bitte wählen Sie eine Datei mit der Endung .csv oder .xlsx.",
+  calendarSelectedFile: "Ausgewählte Datei",
+  calendarSubmit: "Konvertierung starten",
+  calendarConverting: "Wird konvertiert …",
+  calendarReset: "Zurücksetzen",
+  calendarRequestCompleted:
+    "Die Konvertierung ist abgeschlossen. Die Ergebnisanzeige folgt im nächsten Schritt.",
+  calendarRequestFailed:
+    "Die Konvertierung konnte nicht abgeschlossen werden. Die detaillierte Fehleranzeige folgt im nächsten Schritt.",
   errorMissingFilename: "Die hochgeladene Datei hat keinen Namen.",
   errorUnsupportedFileType: "Es werden nur CSV- und XLSX-Dateien unterstützt.",
   errorOversizedUpload: "Die Datei überschreitet die maximale Größe von 10 MiB.",
@@ -70,8 +85,23 @@ export const italianTranslations = {
     "Prepara i piani dei turni CSV o XLSX per importarli in un'applicazione calendario.",
   calendarAcceptedFormats: "Formati accettati",
   calendarOpen: "Apri lo strumento",
-  calendarPlaceholder:
-    "Il convertitore di calendari sarà configurato in uno dei prossimi passaggi.",
+  calendarUploadIntro:
+    "Seleziona un piano dei turni e avvia la conversione locale sicura.",
+  calendarDropTitle: "Trascina qui il piano dei turni",
+  calendarDropHint: "Oppure scegli un file da questo dispositivo.",
+  calendarChooseFile: "Scegli un file",
+  calendarChooseAnother: "Scegli un altro file",
+  calendarFileRequirements: "Sono accettati file CSV e XLSX.",
+  calendarInvalidExtension:
+    "Scegli un file con estensione .csv o .xlsx.",
+  calendarSelectedFile: "File selezionato",
+  calendarSubmit: "Avvia la conversione",
+  calendarConverting: "Conversione in corso …",
+  calendarReset: "Reimposta",
+  calendarRequestCompleted:
+    "La conversione è terminata. La visualizzazione del risultato sarà aggiunta nel prossimo passaggio.",
+  calendarRequestFailed:
+    "Non è stato possibile completare la conversione. I dettagli dell'errore saranno aggiunti nel prossimo passaggio.",
   errorMissingFilename: "Il file caricato non ha un nome.",
   errorUnsupportedFileType: "Sono supportati soltanto file CSV e XLSX.",
   errorOversizedUpload: "Il file supera la dimensione massima di 10 MiB.",

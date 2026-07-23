@@ -38,7 +38,32 @@ def test_adapter_has_no_fastapi_dependency() -> None:
     assert "fastapi" not in imported_roots
 
 
-def test_translates_library_result_into_backend_domain_data() -> None:
+def test_translates_successful_conversion_into_backend_domain_data() -> None:
+    source = BytesIO(
+        (
+            CSV_HEADER
+            + "valid,Exercise,true,2026-07-22,,2026-07-22,,,\n"
+        ).encode()
+    )
+
+    result = adapter.convert_schedule(
+        source,
+        filename="schedule.csv",
+        calendar_name="Feuerwehr",
+    )
+
+    assert isinstance(result, ConversionResult)
+    assert (result.total_count, result.converted_count, result.skipped_count) == (
+        1,
+        1,
+        0,
+    )
+    assert result.invalid_events == ()
+    assert "X-WR-CALNAME:Feuerwehr" in result.ics_text
+    assert "UID:valid" in result.ics_text
+
+
+def test_translates_partial_conversion_into_backend_domain_data() -> None:
     source = BytesIO(
         (
             CSV_HEADER
@@ -69,6 +94,31 @@ def test_translates_library_result_into_backend_domain_data() -> None:
     assert invalid.summary == "Invalid"
     assert invalid.issue_codes == (IssueCode.EMPTY_ID,)
     assert type(invalid).__module__.startswith("firefighter_tools_backend.domain")
+
+
+def test_translates_all_invalid_schedule_into_backend_domain_data() -> None:
+    source = BytesIO(
+        (
+            CSV_HEADER
+            + ",Invalid,true,2026-07-23,,2026-07-23,,,\n"
+        ).encode()
+    )
+
+    result = adapter.convert_schedule(
+        source,
+        filename="schedule.csv",
+        calendar_name="Feuerwehr",
+    )
+
+    assert (result.total_count, result.converted_count, result.skipped_count) == (
+        1,
+        0,
+        1,
+    )
+    assert len(result.invalid_events) == 1
+    assert result.invalid_events[0].id == ""
+    assert result.invalid_events[0].issue_codes == (IssueCode.EMPTY_ID,)
+    assert "BEGIN:VEVENT" not in result.ics_text
 
 
 @pytest.mark.parametrize(

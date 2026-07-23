@@ -1,17 +1,26 @@
 """HTTP contract tests for the calendar converter endpoint."""
 
 from collections.abc import Generator
+from pathlib import Path
+import tempfile
+from typing import BinaryIO
 
 import pytest
+from fastapi import UploadFile
 from fastapi.testclient import TestClient
 from httpx2 import Response
+from starlette import formparsers
 
 import firefighter_tools_backend.routes.calendar_converter as route
 from firefighter_tools_backend import create_app
 from firefighter_tools_backend.domain.calendar_conversion import (
     ConversionErrorCode,
+    ConversionResult,
 )
-from firefighter_tools_backend.domain.upload import UploadValidationErrorCode
+from firefighter_tools_backend.domain.upload import (
+    UploadValidationErrorCode,
+    ValidatedUpload,
+)
 from firefighter_tools_backend.services.upload_validation import (
     MAX_UPLOAD_BYTES,
 )
@@ -20,6 +29,12 @@ ENDPOINT = "/api/v1/tools/calendar-converter/convert"
 CSV_HEADER = (
     "id,summary,all_date,start_date,start_time,end_date,end_time,"
     "location,description\n"
+)
+SAMPLE_XLSX_PATH = (
+    Path(__file__).parents[2]
+    / "assets"
+    / "examples"
+    / "calendar_schedule_example.xlsx"
 )
 
 
@@ -74,7 +89,6 @@ def test_returns_success_with_calendar_for_valid_schedule(
     response = post_csv(
         client,
         "event-1,Exercise,true,2026-07-22,,2026-07-22,,,\n",
-        filename="../../incoming/SCHEDULE.CSV",
     )
 
     assert response.status_code == 200
@@ -86,12 +100,39 @@ def test_returns_success_with_calendar_for_valid_schedule(
         payload["skipped_count"],
     ) == (1, 1, 0)
     assert payload["invalid_events"] == []
-    assert payload["calendar"]["filename"] == "SCHEDULE.ics"
+    assert payload["calendar"]["filename"] == "schedule.ics"
     assert payload["calendar"]["mime_type"] == (
         "text/calendar;charset=utf-8"
     )
     assert "X-WR-CALNAME:Feuerwehr Tools" in payload["calendar"]["ics_text"]
     assert "UID:event-1" in payload["calendar"]["ics_text"]
+
+
+def test_returns_success_for_valid_xlsx(client: TestClient) -> None:
+    with SAMPLE_XLSX_PATH.open("rb") as source:
+        response = client.post(
+            ENDPOINT,
+            files={
+                "file": (
+                    SAMPLE_XLSX_PATH.name,
+                    source,
+                    (
+                        "application/vnd.openxmlformats-officedocument."
+                        "spreadsheetml.sheet"
+                    ),
+                )
+            },
+        )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "success"
+    assert (
+        payload["total_count"],
+        payload["converted_count"],
+        payload["skipped_count"],
+    ) == (3, 3, 0)
+    assert payload["calendar"]["filename"] == "calendar_schedule_example.ics"
 
 
 def test_returns_partial_with_invalid_event_details(
@@ -123,7 +164,12 @@ def test_returns_partial_with_invalid_event_details(
             "issue_codes": ["empty_id"],
         }
     ]
-    assert payload["calendar"] is not None
+    calendar = payload["calendar"]
+    assert calendar["filename"] == "schedule.ics"
+    assert calendar["mime_type"] == "text/calendar;charset=utf-8"
+    assert "BEGIN:VCALENDAR" in calendar["ics_text"]
+    assert "UID:valid" in calendar["ics_text"]
+    assert "SUMMARY:Invalid" not in calendar["ics_text"]
 
 
 def test_returns_normal_failure_without_calendar_when_all_events_are_invalid(
@@ -169,6 +215,50 @@ def test_maps_unsupported_extension_to_safe_415(client: TestClient) -> None:
     }
 
 
+def test_accepts_upload_of_exactly_ten_mebibytes(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured_size = 0
+
+    def convert_exact_limit(
+        source: BinaryIO,
+        *,
+        filename: str,
+    ) -> ConversionResult:
+        nonlocal captured_size
+        captured_size = len(source.read())
+        assert filename == "schedule.csv"
+        return ConversionResult(
+            ics_text="BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n",
+            total_count=1,
+            converted_count=1,
+            skipped_count=0,
+            invalid_events=(),
+        )
+
+    monkeypatch.setattr(
+        route.calendar_conversion,
+        "convert_calendar",
+        convert_exact_limit,
+    )
+
+    response = client.post(
+        ENDPOINT,
+        files={
+            "file": (
+                "schedule.csv",
+                b"x" * MAX_UPLOAD_BYTES,
+                "text/csv",
+            )
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "success"
+    assert captured_size == MAX_UPLOAD_BYTES
+
+
 def test_maps_oversized_upload_to_safe_413(client: TestClient) -> None:
     response = client.post(
         ENDPOINT,
@@ -200,6 +290,60 @@ def test_maps_structurally_malformed_schedule_to_safe_422(
     }
 
 
+def test_maps_structurally_malformed_xlsx_to_safe_422(
+    client: TestClient,
+) -> None:
+    response = client.post(
+        ENDPOINT,
+        files={
+            "file": (
+                "schedule.xlsx",
+                b"not an XLSX workbook",
+                (
+                    "application/vnd.openxmlformats-officedocument."
+                    "spreadsheetml.sheet"
+                ),
+            )
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {
+        "code": "malformed_xlsx",
+        "message": "The XLSX schedule is malformed.",
+    }
+
+
+def test_sanitizes_dangerous_filename(client: TestClient) -> None:
+    response = post_csv(
+        client,
+        "event-1,Exercise,true,2026-07-22,,2026-07-22,,,\n",
+        filename="../../schedule.csv",
+    )
+
+    assert response.status_code == 200
+    assert response.json()["calendar"]["filename"] == "schedule.ics"
+
+
+def test_preserves_unicode_filename_and_event_data(client: TestClient) -> None:
+    response = post_csv(
+        client,
+        (
+            "übung-1,Atemschutzübung,true,2026-07-22,,2026-07-22,,"
+            "München,Grüße aus Südtirol\n"
+        ),
+        filename="../../Übungsplan_🔥.csv",
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["calendar"]["filename"] == "Übungsplan_🔥.ics"
+    assert "UID:übung-1" in payload["calendar"]["ics_text"]
+    assert "SUMMARY:Atemschutzübung" in payload["calendar"]["ics_text"]
+    assert "LOCATION:München" in payload["calendar"]["ics_text"]
+    assert "DESCRIPTION:Grüße aus Südtirol" in payload["calendar"]["ics_text"]
+
+
 def test_maps_unexpected_problem_to_generic_500(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
@@ -226,3 +370,33 @@ def test_maps_unexpected_problem_to_generic_500(
         "message": "The request could not be processed.",
     }
     assert secret_detail not in response.text
+
+
+def test_uploaded_data_is_not_retained_after_request(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    captured_uploads: list[UploadFile] = []
+    original_validate_upload = route.validate_upload
+
+    async def capture_upload(upload: UploadFile) -> ValidatedUpload:
+        captured_uploads.append(upload)
+        return await original_validate_upload(upload)
+
+    monkeypatch.setattr(route, "validate_upload", capture_upload)
+    monkeypatch.setattr(formparsers.MultiPartParser, "spool_max_size", 1)
+    monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))
+
+    response = post_csv(
+        client,
+        (
+            "event-1,Exercise,true,2026-07-22,,2026-07-22,,,"
+            "unique-retention-marker\n"
+        ),
+    )
+
+    assert response.status_code == 200
+    assert len(captured_uploads) == 1
+    assert captured_uploads[0].file.closed
+    assert list(tmp_path.iterdir()) == []

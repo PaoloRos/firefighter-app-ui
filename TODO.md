@@ -238,3 +238,86 @@ POST /api/v1/tools/calendar-converter/convert
 1. From the repository root, run `backend/.venv/bin/python -m firefighter_tools_backend` and confirm that Uvicorn reports `http://127.0.0.1:8000`.
 2. In another terminal, run `printf '%s\n' 'id,summary,all_date,start_date,start_time,end_date,end_time,location,description' 'event-1,Exercise,true,2026-07-22,,2026-07-22,,,' | curl -sS -F 'file=@-;filename=schedule.csv;type=text/csv' http://127.0.0.1:8000/api/v1/tools/calendar-converter/convert`.
 3. Confirm that the JSON has `status` set to `success`, counts `1`, `1`, and `0`, calendar filename `schedule.ics`, and ICS text containing `UID:event-1`; then stop the server with `Ctrl+C`.
+
+### TASK-012 - Add the sample schedule
+
+**Ask**: Store one small, version-controlled XLSX example in the application assets—not in an upload or runtime directory. Verify that it uses exactly the columns required by `calendar-conversion v0.2.0`.
+
+**Answer:** Added a 4.8 KiB styled XLSX example at `assets/examples/calendar_schedule_example.xlsx` with the exact nine `calendar-conversion v0.2.0` columns and three valid German example events using native boolean, date, and time cells. Verified its values and formatting through spreadsheet inspection and rendering, confirmed all three events convert without skips, and confirmed the HTTP endpoint accepts the asset successfully.
+
+**Automated test:**
+
+1. From the repository root, run `backend/.venv/bin/python -m pytest backend/tests/test_sample_schedule.py -vv` and confirm that all four sample-asset tests pass.
+2. Run `make test` and confirm that 56 backend tests and six frontend tests pass.
+3. Run `backend/.venv/bin/python -m pip check` and confirm that it reports `No broken requirements found.`
+4. Run `git diff --check` and confirm that it produces no output and exits successfully.
+
+**Developer demo:**
+
+1. Open `assets/examples/calendar_schedule_example.xlsx` and confirm that the `Beispiel` worksheet shows the nine required headers plus three readable example rows, including timed and all-day events.
+2. From the repository root, run `backend/.venv/bin/python -c 'from importlib.metadata import version; from pathlib import Path; from firefighter_tools_backend.services.calendar_conversion import convert_calendar; path=Path("assets/examples/calendar_schedule_example.xlsx"); source=path.open("rb"); result=convert_calendar(source, filename=path.name); source.close(); print(version("calendar-conversion"), result.total_count, result.converted_count, result.skipped_count)'`.
+3. Confirm that it prints `0.2.0 3 3 0`.
+
+### TASK-013 - Test in layers
+
+**Ask**: Add adapter tests for:
+
+- Successful conversion.
+- Partial conversion.
+- All-invalid schedule.
+- Stable fatal-error translation.
+
+Add API tests for:
+
+- Valid CSV and XLSX.
+- Partial conversion with downloadable ICS content.
+- All-invalid input with `calendar: null`.
+- Unsupported extension.
+- Exactly 10 MiB and over 10 MiB.
+- Malformed CSV/XLSX.
+- Dangerous filenames such as `../../schedule.csv`.
+- Unicode filenames and event data.
+- Unexpected converter failure returning a safe `500`.
+- Uploaded data not retained after the request.
+
+**Answer:** Expanded the adapter and API suites into explicit behavioral layers. Adapter tests now distinguish successful, partial, and all-invalid results while exhaustively checking stable fatal-code translation. API tests now cover valid CSV/XLSX, partial downloadable ICS, all-invalid output, both size boundaries, malformed formats, dangerous and Unicode filenames/data, safe unexpected failures, and closed multipart storage with no retained temporary file.
+
+**Automated test:**
+
+1. From the repository root, run `backend/.venv/bin/python -m pytest backend/tests/test_calendar_conversion_adapter.py backend/tests/test_calendar_converter_endpoint.py -vv` and confirm that all 25 layered adapter/API tests pass.
+2. Run `make test` and confirm that 64 backend tests and six frontend tests pass.
+3. Run `backend/.venv/bin/python -m pip check` and confirm that it reports `No broken requirements found.`
+4. Run `git diff --check` and confirm that it produces no output and exits successfully.
+
+**Developer demo:**
+
+1. From the repository root, run `backend/.venv/bin/python -m firefighter_tools_backend` and confirm that Uvicorn reports `http://127.0.0.1:8000`.
+2. In another terminal, run `curl -sS -F 'file=@assets/examples/calendar_schedule_example.xlsx;filename=../../Übungsplan_🔥.xlsx;type=application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' http://127.0.0.1:8000/api/v1/tools/calendar-converter/convert`.
+3. Confirm that the JSON reports `status: "success"`, counts `3`, `3`, and `0`, a sanitized calendar filename `Übungsplan_🔥.ics`, and Unicode ICS event content; then stop the server with `Ctrl+C`.
+
+### TASK-014 - Perform final boundary checks
+
+**Ask**: Confirm that:
+
+- The route never invokes the converter CLI.
+- The backend depends on the tagged `v0.2.0` API.
+- Only valid events appear in returned ICS text.
+- No empty calendar is returned for all-invalid input.
+- Responses contain no traceback or local filesystem path.
+- Tests leave no uploaded or generated calendar files behind.
+
+**Answer:** Added six dedicated final-boundary checks proving that the HTTP-to-adapter import path uses the typed converter service without CLI or subprocess access, the backend declares and runs `calendar-conversion v0.2.0`, partial ICS includes only valid events, all-invalid input returns no calendar, expected and unexpected responses redact tracebacks and local paths, and disk-spooled uploads plus generated calendars leave no files behind.
+
+**Automated test:**
+
+1. From the repository root, run `backend/.venv/bin/python -m pytest backend/tests/test_calendar_converter_boundaries.py -vv` and confirm that all six final-boundary checks pass.
+2. Run `make test` and confirm that 70 backend tests and six frontend tests pass.
+3. Run `backend/.venv/bin/python -m pip check` and confirm that it reports `No broken requirements found.`
+4. Run `find . -path './.git' -prune -o -path './backend/.venv' -prune -o -path './frontend/node_modules' -prune -o -path './frontend/dist' -prune -o -type f -name '*.ics' -print` and confirm that it produces no output.
+5. Run `git diff --check` and confirm that it produces no output and exits successfully.
+
+**Developer demo:**
+
+1. From the repository root, run `backend/.venv/bin/python -c 'from importlib.metadata import version; from firefighter_tools_backend.adapters.calendar_conversion import library_convert_schedule; print(version("calendar-conversion"), library_convert_schedule.__module__)'`.
+2. Confirm that it prints `0.2.0 calendar_conversion.service`, demonstrating the tagged typed-service boundary rather than the converter CLI.
+3. Run `backend/.venv/bin/python -m pytest backend/tests/test_calendar_converter_boundaries.py -vv` and confirm that the six named checks visibly cover valid-only ICS, no all-invalid calendar, redaction, and no retained files.

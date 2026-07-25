@@ -454,3 +454,78 @@ The backend remains authoritative for file type, structure, and the 10 MiB limit
 6. Select `Italiano` and confirm that the upload instructions, validation, buttons, and status text switch to Italian.
 7. Resize the browser to a phone-sized width around 375 px and confirm that the controls stack without horizontal scrolling.
 8. Stop both development servers with `Ctrl+C`.
+
+### TASK-019 - Implement converter states and translated results
+
+**Ask**: Implement a discriminated converter state machine with:
+
+- `idle`, `selected`, `converting`, `result`, and `fatal` states.
+- The selected file retained through conversion and result handling.
+- Backend `success`, `partial`, and all-invalid `failure` results kept distinct from fatal API errors.
+- Translated presentations for converted and skipped counts, all-invalid results, unsupported uploads, oversized uploads, malformed schedules, and safe unexpected server errors.
+- Reset and choose-another-file behavior from completed outcomes.
+- Returned calendar data retained in state for the later Blob-based ICS download task.
+
+Do not display tracebacks, local paths, or untranslated technical identifiers. The polished partial-result presentation and actual calendar download remain part of PLAN step 5.
+
+**Answer:** Replaced the converter's independent selection, conversion, and request-status flags with one discriminated `idle`/`selected`/`converting`/`result`/`fatal` state. Selected files now remain attached to converting, result, and backend-error states; successful, partial, and all-invalid responses preserve the typed backend result and returned calendar data. Added German/Italian result panels for converted and skipped counts, the prepared calendar filename, skipped-event source details, and translated issue descriptions. Fatal outcomes render only translations of stable API codes, including safe handling of unexpected client failures, without exposing backend messages, tracebacks, or paths. Reset and replacement selection clear completed outcomes, while all-invalid results remain normal results with no calendar filename or download action. Blob-based download remains deferred to PLAN step 5. Verified 23 focused workflow/route/translation tests, 70 backend and 37 frontend tests, strict TypeScript checking, the production build, dependency consistency, no generated ICS files, clean diff checks, real loopback partial/all-invalid payloads, and the bilingual idle page at desktop and phone widths without overflow or browser errors.
+
+**Automated test:**
+
+1. From the repository root, run `cd frontend && ./node_modules/.bin/vitest run src/pages/CalendarConverterPage.test.tsx src/App.test.tsx src/i18n/translations.test.ts` and confirm that all 23 focused state, result, route, and translation tests pass.
+2. From `frontend/`, run `./node_modules/.bin/tsc -b` and confirm that strict TypeScript checking completes successfully.
+3. Still in `frontend/`, run `./node_modules/.bin/vite build` and confirm that the production build completes successfully.
+4. Return to the repository root, run `make test`, and confirm that 70 backend tests and 37 frontend tests pass.
+5. Run `backend/.venv/bin/python -m pip check` and confirm that it reports `No broken requirements found.`
+6. Run `find . -path './.git' -prune -o -path './backend/.venv' -prune -o -path './frontend/node_modules' -prune -o -path './frontend/dist' -prune -o -type f -name '*.ics' -print` and confirm that it produces no output.
+7. Run `git diff --check` and confirm that it produces no output and exits successfully.
+
+**Developer demo:**
+
+1. From the repository root, run `make dev` and open `http://127.0.0.1:5173/tools/calendar-converter`.
+2. Choose `assets/examples/calendar_schedule_example.xlsx`, start the conversion, and confirm that the German success result shows three converted events, zero skipped events, and `calendar_schedule_example.ics`.
+3. Select `Italiano` while the result remains visible and confirm that its title, description, and count labels change to Italian while the filename is preserved.
+4. Select `Reimposta`, choose `TODO.md`, and confirm that the translated unsupported-file message appears immediately while submission remains disabled and no backend message or technical code is shown.
+5. Return to the sample XLSX, start conversion, and confirm that file replacement is unavailable only during `Conversione in corso …`; after the result, replacement and reset are available again.
+6. Resize the browser to a phone-sized width around 375 px and confirm that the result counts and actions stack without horizontal scrolling.
+7. Stop both development servers with `Ctrl+C`.
+
+### TASK-020 - Verify the responsive bilingual workflow
+
+**Ask**: Complete the step-4 frontend verification for:
+
+- German default behavior.
+- Switching to Italian and back.
+- Persistence only after an explicit language choice.
+- Matching German/Italian translation keys.
+- Dashboard navigation.
+- Picker and drag-and-drop selection.
+- Invalid client-side extensions.
+- `idle`, `selected`, `converting`, `result`, and `fatal` states.
+- Duplicate-submit prevention.
+- Success, partial, all-invalid, and API-error rendering.
+- Reset and replacement-file behavior.
+- Functional rendering at phone and desktop widths without horizontal overflow.
+
+Mock the API client in component tests and do not reproduce backend conversion logic in frontend tests. Fix any functional responsive or bilingual workflow defects discovered, while leaving the polished design system, advanced accessibility review, calendar download, and detailed inline help to PLAN step 5.
+
+**Answer:** Completed the step-4 workflow verification without adding browser-download or backend logic. Extended the frontend integration tests to navigate from the dashboard into the converter, switch explicitly from German to Italian and back while verifying `localStorage` and the document language, preserve completed result/file/calendar state through both language changes, and render the functional partial-result structure at 320 px and 1280 px with the API client mocked. The full frontend suite now covers the complete requested picker, drag-and-drop, state, result, error, reset, replacement, translation, persistence, and navigation matrix. Live browser measurement found and fixed one functional defect: the body's 320 px minimum width caused 15 px of horizontal overflow when a vertical scrollbar was present at the narrow boundary. The body can now shrink to the available width. Verified clean German/Italian dashboard-to-converter navigation and persistence, no horizontal overflow at 320 px or 1200 px, responsive action sizing, and no browser errors. The PLAN step-5 design, accessibility, help, and download scope remains unchanged.
+
+**Automated test:**
+
+1. From the repository root, run `cd frontend && ./node_modules/.bin/vitest run src/pages/CalendarConverterPage.test.tsx src/App.test.tsx src/pages/DashboardPage.test.tsx src/i18n/translations.test.ts` and confirm that all 29 focused bilingual workflow tests pass.
+2. From `frontend/`, run `./node_modules/.bin/tsc -b` and confirm that strict TypeScript checking completes successfully.
+3. Still in `frontend/`, run `./node_modules/.bin/vite build` and confirm that the production build completes successfully.
+4. Return to the repository root, run `make test`, and confirm that 70 backend tests and 41 frontend tests pass.
+5. Run `backend/.venv/bin/python -m pip check` and confirm that it reports `No broken requirements found.`
+6. Run `find . -path './.git' -prune -o -path './backend/.venv' -prune -o -path './frontend/node_modules' -prune -o -path './frontend/dist' -prune -o -type f -name '*.ics' -print` and confirm that it produces no output.
+7. Run `git diff --check` and confirm that it produces no output and exits successfully.
+
+**Developer demo:**
+
+1. From the repository root, run `make dev` if the development servers are not already running, then open `http://127.0.0.1:5173/`.
+2. Confirm that the dashboard starts in German when no language was previously chosen. Select `Italiano`, open the calendar tool, and confirm that the converter remains Italian.
+3. Select `Deutsch`, reload `http://127.0.0.1:5173/tools/calendar-converter`, and confirm that the explicit German choice persists.
+4. Choose `assets/examples/calendar_schedule_example.xlsx`, start conversion, switch to Italian and back after the result appears, and confirm that the selected filename, prepared calendar filename, and counts remain unchanged while every visible label is translated.
+5. Resize the browser to approximately 320 px and then 1200 px wide. Confirm that the page has no horizontal scrolling, the phone controls and count cards use the available width, and the desktop actions return to their compact inline layout.
+6. Stop the development servers with `Ctrl+C` only if you started them in step 1.

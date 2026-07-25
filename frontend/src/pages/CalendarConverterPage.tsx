@@ -7,40 +7,47 @@ import {
 } from "react";
 import { Link } from "react-router-dom";
 
-import { convertCalendar } from "../api/calendarConverter";
+import {
+  type ApiErrorCode,
+  type ConversionResponse,
+  convertCalendar,
+  type InvalidEvent,
+} from "../api/calendarConverter";
 import { useI18n } from "../i18n/I18nProvider";
 
-type RequestStatus = "ready" | "completed" | "failed";
+export type ConverterState =
+  | { status: "idle" }
+  | { status: "selected"; file: File }
+  | { status: "converting"; file: File }
+  | { status: "result"; file: File; result: ConversionResponse }
+  | { status: "fatal"; file?: File; errorCode: ApiErrorCode };
 
 export function CalendarConverterPage() {
-  const { t } = useI18n();
+  const { t, translateApiError, translateConverterIssue } = useI18n();
   const inputRef = useRef<HTMLInputElement>(null);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [selectionError, setSelectionError] = useState(false);
+  const [workflow, setWorkflow] = useState<ConverterState>({ status: "idle" });
   const [isDragging, setIsDragging] = useState(false);
-  const [isConverting, setIsConverting] = useState(false);
-  const [requestStatus, setRequestStatus] = useState<RequestStatus>("ready");
+  const isConverting = workflow.status === "converting";
+  const selectedFile = getStateFile(workflow);
 
   function selectFile(file: File | null) {
-    setRequestStatus("ready");
-
     if (file === null) {
-      setSelectedFile(null);
-      setSelectionError(false);
+      setWorkflow({ status: "idle" });
       return;
     }
 
     if (!hasSupportedExtension(file.name)) {
-      setSelectedFile(null);
-      setSelectionError(true);
+      setWorkflow({
+        status: "fatal",
+        errorCode: "unsupported_file_type",
+      });
       if (inputRef.current !== null) {
         inputRef.current.value = "";
       }
       return;
     }
 
-    setSelectedFile(file);
-    setSelectionError(false);
+    setWorkflow({ status: "selected", file });
   }
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
@@ -79,19 +86,34 @@ export function CalendarConverterPage() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (selectedFile === null || isConverting) {
+    if (workflow.status !== "selected") {
       return;
     }
 
-    setIsConverting(true);
-    setRequestStatus("ready");
+    const file = workflow.file;
+    setWorkflow({ status: "converting", file });
+
     try {
-      const result = await convertCalendar(selectedFile);
-      setRequestStatus(result.ok ? "completed" : "failed");
+      const conversion = await convertCalendar(file);
+      if (conversion.ok) {
+        setWorkflow({
+          status: "result",
+          file,
+          result: conversion.response,
+        });
+      } else {
+        setWorkflow({
+          status: "fatal",
+          file,
+          errorCode: conversion.error.code,
+        });
+      }
     } catch {
-      setRequestStatus("failed");
-    } finally {
-      setIsConverting(false);
+      setWorkflow({
+        status: "fatal",
+        file,
+        errorCode: "internal_error",
+      });
     }
   }
 
@@ -131,12 +153,6 @@ export function CalendarConverterPage() {
           <p className="file-requirements">{t("calendarFileRequirements")}</p>
         </div>
 
-        {selectionError ? (
-          <p className="form-message error-message" role="alert">
-            {t("calendarInvalidExtension")}
-          </p>
-        ) : null}
-
         {selectedFile !== null ? (
           <div className="selected-file" aria-live="polite">
             <span>{t("calendarSelectedFile")}</span>
@@ -144,22 +160,21 @@ export function CalendarConverterPage() {
           </div>
         ) : null}
 
-        {requestStatus === "completed" ? (
-          <p className="form-message" role="status">
-            {t("calendarRequestCompleted")}
-          </p>
+        {workflow.status === "result" ? (
+          <ConversionResultPanel result={workflow.result} />
         ) : null}
-        {requestStatus === "failed" ? (
-          <p className="form-message error-message" role="alert">
-            {t("calendarRequestFailed")}
-          </p>
+        {workflow.status === "fatal" ? (
+          <section className="result-panel fatal-result" role="alert">
+            <h2>{t("calendarFatalTitle")}</h2>
+            <p>{translateApiError(workflow.errorCode)}</p>
+          </section>
         ) : null}
 
         <div className="form-actions">
           <button
             className="primary-button"
             type="submit"
-            disabled={selectedFile === null || isConverting}
+            disabled={workflow.status !== "selected"}
           >
             {isConverting
               ? t("calendarConverting")
@@ -168,12 +183,7 @@ export function CalendarConverterPage() {
           <button
             className="secondary-button"
             type="button"
-            disabled={
-              isConverting ||
-              (selectedFile === null &&
-                !selectionError &&
-                requestStatus === "ready")
-            }
+            disabled={workflow.status === "idle" || isConverting}
             onClick={resetWorkflow}
           >
             {t("calendarReset")}
@@ -186,8 +196,92 @@ export function CalendarConverterPage() {
       </Link>
     </section>
   );
+
+  function ConversionResultPanel({ result }: { result: ConversionResponse }) {
+    const titleKey =
+      result.status === "success"
+        ? "calendarSuccessTitle"
+        : result.status === "partial"
+          ? "calendarPartialTitle"
+          : "calendarFailureTitle";
+    const descriptionKey =
+      result.status === "success"
+        ? "calendarSuccessDescription"
+        : result.status === "partial"
+          ? "calendarPartialDescription"
+          : "calendarFailureDescription";
+
+    return (
+      <section
+        className={`result-panel ${result.status}-result`}
+        role="status"
+      >
+        <h2>{t(titleKey)}</h2>
+        <p>{t(descriptionKey)}</p>
+        <dl className="result-counts">
+          <div>
+            <dt>{t("calendarConvertedCount")}</dt>
+            <dd>{result.converted_count}</dd>
+          </div>
+          <div>
+            <dt>{t("calendarSkippedCount")}</dt>
+            <dd>{result.skipped_count}</dd>
+          </div>
+        </dl>
+
+        {result.calendar !== null ? (
+          <p className="calendar-result-file">
+            <span>{t("calendarResultFilename")}</span>
+            <strong>{result.calendar.filename}</strong>
+          </p>
+        ) : null}
+
+        {result.invalid_events.length > 0 ? (
+          <div className="invalid-events">
+            <h3>{t("calendarInvalidEventsTitle")}</h3>
+            <ul className="invalid-event-list">
+              {result.invalid_events.map((event, index) => (
+                <InvalidEventItem
+                  event={event}
+                  key={`${event.source_position.event_index}-${index}`}
+                />
+              ))}
+            </ul>
+          </div>
+        ) : null}
+      </section>
+    );
+  }
+
+  function InvalidEventItem({ event }: { event: InvalidEvent }) {
+    const eventName =
+      event.summary.trim() ||
+      event.id.trim() ||
+      `${t("calendarEventFallback")} ${event.source_position.event_index}`;
+
+    return (
+      <li>
+        <strong>{eventName}</strong>
+        <span className="event-source">
+          {t("calendarRowLabel")} {event.source_position.row}
+          {event.source_position.worksheet === null
+            ? null
+            : ` · ${t("calendarWorksheetLabel")} ${event.source_position.worksheet}`}
+        </span>
+        <ul>
+          {event.issue_codes.map((code) => (
+            <li key={code}>{translateConverterIssue(code)}</li>
+          ))}
+        </ul>
+      </li>
+    );
+  }
 }
 
 export function hasSupportedExtension(filename: string): boolean {
   return /\.(csv|xlsx)$/i.test(filename);
+}
+
+function getStateFile(state: ConverterState): File | null {
+  return "file" in state && state.file !== undefined ? state.file : null;
 }

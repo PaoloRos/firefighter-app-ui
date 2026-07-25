@@ -17,10 +17,36 @@ describe("App routing", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("heading", { level: 1, name: "Werkzeuge für die Feuerwehr" })).toBeVisible();
+    expect(
+      screen.getByRole("heading", {
+        level: 1,
+        name: "Werkzeuge für die Feuerwehr",
+      }),
+    ).toBeVisible();
     expect(screen.getByRole("link", { name: "Werkzeug öffnen" })).toHaveAttribute(
       "href",
       "/tools/calendar-converter",
+    );
+  });
+
+  it("navigates from the dashboard into the converter workflow", () => {
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("link", { name: "Werkzeug öffnen" }));
+
+    expect(
+      screen.getByRole("heading", {
+        level: 1,
+        name: "Dienstplan konvertieren",
+      }),
+    ).toBeVisible();
+    expect(screen.getByLabelText("Datei auswählen")).toHaveAttribute(
+      "accept",
+      ".csv,.xlsx",
     );
   });
 
@@ -31,7 +57,12 @@ describe("App routing", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("heading", { level: 1, name: "Dienstplan konvertieren" })).toBeVisible();
+    expect(
+      screen.getByRole("heading", {
+        level: 1,
+        name: "Dienstplan konvertieren",
+      }),
+    ).toBeVisible();
     expect(screen.getByLabelText("Datei auswählen")).toHaveAttribute(
       "accept",
       ".csv,.xlsx",
@@ -45,13 +76,20 @@ describe("App routing", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("heading", { level: 1, name: "Werkzeuge für die Feuerwehr" })).toBeVisible();
-    expect(screen.getByRole("button", { name: "Deutsch" })).toHaveAttribute("aria-pressed", "true");
+    expect(
+      screen.getByRole("heading", {
+        level: 1,
+        name: "Werkzeuge für die Feuerwehr",
+      }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "Deutsch" }),
+    ).toHaveAttribute("aria-pressed", "true");
     expect(document.documentElement).toHaveAttribute("lang", "de");
     expect(window.localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBeNull();
   });
 
-  it("switches to Italian and persists the explicit choice", () => {
+  it("switches to Italian and back while persisting each explicit choice", () => {
     render(
       <MemoryRouter initialEntries={["/"]}>
         <App />
@@ -60,12 +98,33 @@ describe("App routing", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Italiano" }));
 
-    expect(screen.getByRole("heading", { level: 1, name: "Strumenti per i vigili del fuoco" })).toBeVisible();
+    expect(
+      screen.getByRole("heading", {
+        level: 1,
+        name: "Strumenti per i vigili del fuoco",
+      }),
+    ).toBeVisible();
     expect(screen.getByRole("link", { name: "Apri lo strumento" })).toBeVisible();
-    expect(screen.getByRole("button", { name: "Italiano" })).toHaveAttribute("aria-pressed", "true");
+    expect(
+      screen.getByRole("button", { name: "Italiano" }),
+    ).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByText("Feuerwehr Tools")).toBeVisible();
     expect(document.documentElement).toHaveAttribute("lang", "it");
     expect(window.localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe("it");
+
+    fireEvent.click(screen.getByRole("button", { name: "Deutsch" }));
+
+    expect(
+      screen.getByRole("heading", {
+        level: 1,
+        name: "Werkzeuge für die Feuerwehr",
+      }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "Deutsch" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(document.documentElement).toHaveAttribute("lang", "de");
+    expect(window.localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe("de");
   });
 
   it("restores a previously selected language", () => {
@@ -77,7 +136,12 @@ describe("App routing", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("heading", { level: 1, name: "Converti il piano dei turni" })).toBeVisible();
+    expect(
+      screen.getByRole("heading", {
+        level: 1,
+        name: "Converti il piano dei turni",
+      }),
+    ).toBeVisible();
     expect(screen.getByLabelText("Scegli un file")).toBeVisible();
     expect(screen.getByRole("link", { name: "Torna alla panoramica" })).toBeVisible();
   });

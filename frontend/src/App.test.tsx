@@ -29,6 +29,20 @@ describe("App routing", () => {
     );
   });
 
+  it("provides a translated skip link to the main landmark", () => {
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(
+      screen.getByRole("link", { name: "Zum Hauptinhalt springen" }),
+    ).toHaveAttribute("href", "#main-content");
+    expect(screen.getByRole("main")).toHaveAttribute("id", "main-content");
+    expect(screen.getByRole("main")).toHaveAttribute("tabindex", "-1");
+  });
+
   it("navigates from the dashboard into the converter workflow", () => {
     render(
       <MemoryRouter initialEntries={["/"]}>

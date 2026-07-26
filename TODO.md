@@ -529,3 +529,244 @@ Mock the API client in component tests and do not reproduce backend conversion l
 4. Choose `assets/examples/calendar_schedule_example.xlsx`, start conversion, switch to Italian and back after the result appears, and confirm that the selected filename, prepared calendar filename, and counts remain unchanged while every visible label is translated.
 5. Resize the browser to approximately 320 px and then 1200 px wide. Confirm that the page has no horizontal scrolling, the phone controls and count cards use the available width, and the desktop actions return to their compact inline layout.
 6. Stop the development servers with `Ctrl+C` only if you started them in step 1.
+
+## Step 5 of the implementation workflow
+
+### TASK-021 - Apply the design system
+
+**Ask**: Introduce reusable CSS custom properties for:
+
+- Warm off-white backgrounds.
+- Charcoal text.
+- Restrained fire-red actions.
+- Green success and amber partial-result states.
+- Spacing, typography, borders, radii, and shadows.
+- Narrow and wide layout breakpoints.
+
+Apply them consistently to the header, dashboard cards, converter form, result panels, and actions.
+
+Confirm that:
+
+- There is no horizontal overflow at 320 px.
+- The desktop layout remains comfortable.
+- The interface uses system fonts.
+- Interactive targets are at least 44 × 44 px.
+- Color is not the only indication of state.
+
+**Answer:** Replaced one-off frontend styling values with a reusable civic design system covering the warm canvas and surfaces, charcoal text, restrained fire-red brand actions, green success, amber partial, red failure, typography, spacing, radii, shadows, focus, target sizes, content widths, and narrow/wide breakpoints. Applied the tokens consistently across the shell, dashboard card, converter form, buttons, selected-file notice, result counts, and invalid-event panels. State panels retain translated headings and use distinct left borders in addition to color. Capped the single dashboard card at a comfortable 544 px on desktop while preserving the future multi-card grid. Added four stylesheet contract tests and verified 44–45 px interactive targets, system fonts, no horizontal overflow at 320 px, contained partial results, and a clean browser console without changing application behavior.
+
+**Automated test:**
+
+1. From the repository root, run `cd frontend && ./node_modules/.bin/vitest run src/styles.test.ts src/App.test.tsx src/pages/DashboardPage.test.tsx src/pages/CalendarConverterPage.test.tsx` and confirm that all 29 focused design and component tests pass.
+2. From `frontend/`, run `./node_modules/.bin/tsc -b && ./node_modules/.bin/vite build` and confirm that strict TypeScript checking and the production build complete successfully.
+3. Return to the repository root, run `make test`, and confirm that 70 backend tests and 45 frontend tests pass.
+4. Run `backend/.venv/bin/python -m pip check` and confirm that it reports `No broken requirements found.`
+5. Run `git diff --check` and confirm that it produces no output and exits successfully.
+
+**Developer demo:**
+
+1. From the repository root, run `make dev` if the development servers are not already running, then open `http://127.0.0.1:5173/`.
+2. Confirm that the warm off-white canvas, charcoal text, fire-red brand and primary action, surface card, format badges, consistent rounded corners, and restrained shadows are visible.
+3. Resize the page to approximately 320 px and confirm that the header stacks, the dashboard card and action use the available width, every interactive target remains at least 44 px high, and there is no horizontal scrolling.
+4. Resize to approximately 1200 px and confirm that the header returns to one row and the single tool card remains a comfortable 544 px rather than stretching across the page.
+5. Open `http://127.0.0.1:5173/tools/calendar-converter`, select a supported schedule, and confirm that the drop zone, selected-file notice, primary and secondary actions, and result panel use the same design tokens.
+6. Convert a partially valid schedule and confirm that the amber panel also has a prominent heading and left border, while success and failure panels use their own headings and structural borders. Stop both development servers with `Ctrl+C` only if you started them in step 1.
+
+### TASK-022 - Implement accessibility behavior
+
+**Ask**: Refine semantics and interaction:
+
+- Add a skip link and confirm the main landmark.
+- Maintain logical heading levels.
+- Ensure every input has a programmatic label.
+- Associate validation and file-requirement text with the file input.
+- Keep drag-and-drop supplementary to the keyboard-accessible picker.
+- Announce conversion progress and completed results appropriately.
+- Move focus to the result or fatal-error heading after completion.
+- Restore sensible focus after reset.
+- Preserve visible `:focus-visible` styling.
+- Respect reduced-motion preferences.
+- Verify keyboard-only operation and 200% zoom.
+
+Do not turn the entire drop zone into a custom button when the labelled native file input already provides the correct accessible interaction.
+
+**Answer:** Added a bilingual skip link targeting a programmatically focusable main landmark, preserved the logical page/result heading hierarchy, and kept the drop zone non-interactive so the labelled native file input remains the sole keyboard upload control. The input now references its file requirements and, when applicable, translated validation text; keyboard focus on the visually hidden input produces a visible ring on its label. Added a polite conversion-progress announcement and named result regions, with focus moving to the success/partial/failure or fatal heading after completion and returning to the native picker after reset. Extended reduced-motion coverage to skip navigation and improved the focus-ring contrast from 2.28:1 to 6.28:1. Verified the rendered accessibility tree, partial-result and reset focus, no horizontal overflow at the effective 200% reflow width, 44–45 px visible controls, and a clean browser console.
+
+**Automated test:**
+
+1. From the repository root, run `cd frontend && ./node_modules/.bin/vitest run src/styles.test.ts src/i18n/translations.test.ts src/App.test.tsx src/pages/DashboardPage.test.tsx src/pages/CalendarConverterPage.test.tsx` and confirm that all 35 focused accessibility, design, translation, and component tests pass.
+2. From `frontend/`, run `./node_modules/.bin/tsc -b && ./node_modules/.bin/vite build` and confirm that strict TypeScript checking and the production build complete successfully.
+3. Return to the repository root, run `make test`, and confirm that 70 backend tests and 47 frontend tests pass.
+4. Run `backend/.venv/bin/python -m pip check` and confirm that it reports `No broken requirements found.`
+5. Run `git diff --check` and confirm that it produces no output and exits successfully.
+
+**Developer demo:**
+
+1. From the repository root, run `make dev` if the development servers are not already running, then open `http://127.0.0.1:5173/`.
+2. Press `Tab` and confirm that `Zum Hauptinhalt springen` appears with a strong focus ring. Press `Enter` and confirm that focus moves past the repeated header navigation to the main content.
+3. Open `http://127.0.0.1:5173/tools/calendar-converter` and use only `Tab` and `Shift+Tab` to move through the header, native file picker, conversion action, reset action, and back link. Confirm that every focused visible control has a clear focus ring and the drop zone itself is not a separate tab stop.
+4. Select a partially valid schedule and start conversion. Confirm with a screen reader or accessibility inspector that conversion progress is announced, then confirm that focus moves to the `Teilweise konvertiert` result heading and that its skipped-event details follow in reading order.
+5. Activate `Zurücksetzen` and confirm that focus returns to the native file picker. Select an unsupported file and confirm that the picker description includes both the accepted formats and the translated validation message while focus moves to the fatal heading.
+6. Set browser zoom to 200% and confirm that the page reflows without horizontal scrolling, clipped text, or overlapping controls. Switch to Italian and confirm that the skip link, labels, announcements, and errors remain translated.
+7. Stop both development servers with `Ctrl+C` only if you started them in step 1.
+
+### TASK-023 - Refine partial-result presentation
+
+**Ask**: Make partial conversion unmistakable without treating it as fatal:
+
+- Show a prominent amber partial-result heading.
+- Show total, converted, and skipped counts.
+- Clearly explain that the prepared calendar contains only valid events.
+- Preserve the prepared calendar filename and payload for the later download task.
+- Show one structured entry per skipped event.
+- Show the event summary or a safe fallback label.
+- Show the CSV row or XLSX worksheet and row.
+- Show translated issue descriptions.
+
+For an all-invalid result:
+
+- Show the skipped-event problems.
+- Explain that no event was converted and no calendar file was created.
+- Do not render a calendar-download action.
+
+Do not implement the Blob-based download in this task; it remains `TASK-024`.
+
+**Answer:** Refined the bilingual conversion outcome so partial results have a visible amber status label and heading, total/converted/skipped counts, an explicit valid-events-only notice, and the prepared calendar filename. Each skipped event now has a structured card with its event summary or safe fallback, skipped label, CSV row or XLSX worksheet and row, and translated issue descriptions. All-invalid results retain the skipped-event problems and explicitly state that no calendar file was created. The calendar filename and payload remain in the conversion result for `TASK-024`; no download action or Blob handling was added. Verified the rendered partial result in German and Italian at 1200 px and 320 px, including result-heading focus, no horizontal overflow, and the absence of a download action.
+
+**Automated test:**
+
+1. From the repository root, run `cd frontend && ./node_modules/.bin/vitest run src/styles.test.ts src/i18n/translations.test.ts src/App.test.tsx src/pages/DashboardPage.test.tsx src/pages/CalendarConverterPage.test.tsx` and confirm that all 37 focused result-presentation, translation, design, accessibility, and component tests pass.
+2. From `frontend/`, run `./node_modules/.bin/tsc -b && ./node_modules/.bin/vite build` and confirm that strict TypeScript checking and the production build complete successfully.
+3. Return to the repository root, run `make test`, and confirm that 70 backend tests and 49 frontend tests pass.
+4. Run `backend/.venv/bin/python -m pip check` and confirm that it reports `No broken requirements found.`
+5. Run `find . -path './.git' -prune -o -name '*.ics' -print` and confirm that it produces no output.
+6. Run `git diff --check` and confirm that it produces no output and exits successfully.
+
+**Developer demo:**
+
+1. From the repository root, run `make dev` if the development servers are not already running, then open `http://127.0.0.1:5173/tools/calendar-converter`.
+2. Select a partially valid CSV or XLSX schedule and start conversion. Confirm that the amber result shows `Teilergebnis`, total/converted/skipped counts, the valid-events-only notice, and the prepared `.ics` filename.
+3. Confirm that every skipped event has its own entry with a summary or fallback label, `Übersprungen`, its CSV row or XLSX worksheet and row, and a translated list of problems.
+4. Confirm that focus moves to the result heading and that no calendar-download action is shown.
+5. Switch to Italian and confirm that the result status, count labels, valid-only notice, skipped label, locations, and issue descriptions are translated.
+6. Convert an all-invalid schedule and confirm that its skipped-event problems remain visible, the result says that no calendar file was created, and no download action appears.
+7. Resize the browser to approximately 320 px and confirm that the three count cards and skipped-event details stack without horizontal scrolling or clipped text. Stop both development servers with `Ctrl+C` only if you started them in step 1.
+
+### TASK-024 - Implement local calendar download
+
+**Ask**: Add the calendar-download action defined in PLAN step 5:
+
+- Create a `text/calendar;charset=utf-8` Blob from the returned ICS text.
+- Initiate the download locally with the backend-provided sanitized filename.
+- Show the action for successful and partial conversions.
+- Keep the partial-result explanation that the calendar contains only valid events.
+- Do not offer a download when all events are invalid and `calendar` is `null`.
+- Revoke temporary object URLs and retain no generated calendar files.
+- Translate the download action in German and Italian.
+- Cover success, partial, all-invalid, repeated-download, and reset behavior in frontend tests.
+
+**Answer:** Added a translated calendar-download button to successful and partial conversion results. Each activation creates a `text/calendar;charset=utf-8` Blob from the backend-returned ICS text, uses the backend-provided sanitized `.ics` filename, triggers a local browser download, removes its temporary anchor, and immediately revokes the object URL. Repeated downloads create and revoke independent URLs. All-invalid results still render their problems without a download action, while replacement selection and reset remove completed download controls. Added German `Kalender herunterladen` and Italian `Scarica il calendario` labels plus responsive result-action styling. Verified real Italian success and German partial downloads: the example XLSX produced a 775-byte `text/calendar` file with three events, and the partial CSV produced a calendar containing exactly its one valid event.
+
+**Automated test:**
+
+1. From the repository root, run `cd frontend && ./node_modules/.bin/vitest run src/styles.test.ts src/i18n/translations.test.ts src/App.test.tsx src/pages/DashboardPage.test.tsx src/pages/CalendarConverterPage.test.tsx` and confirm that all 40 focused download, result-presentation, translation, design, accessibility, and component tests pass.
+2. From `frontend/`, run `./node_modules/.bin/tsc -b && ./node_modules/.bin/vite build` and confirm that strict TypeScript checking and the production build complete successfully.
+3. Return to the repository root, run `make test`, and confirm that 70 backend tests and 52 frontend tests pass.
+4. Run `backend/.venv/bin/python -m pip check` and confirm that it reports `No broken requirements found.`
+5. Run `find . -path './.git' -prune -o -name '*.ics' -print` and confirm that it produces no output, proving that the application retained no generated calendar in the repository.
+6. Run `git diff --check` and confirm that it produces no output and exits successfully.
+
+**Developer demo:**
+
+1. From the repository root, run `make dev` if the development servers are not already running, then open `http://127.0.0.1:5173/tools/calendar-converter`.
+2. Select `assets/examples/calendar_schedule_example.xlsx`, start conversion, and confirm that the successful result shows `calendar_schedule_example.ics` and `Kalender herunterladen`.
+3. Activate the download and confirm that the browser saves `calendar_schedule_example.ics`; open it in a text editor or calendar application and confirm that it contains the three example events.
+4. Select a partially valid CSV or XLSX schedule, start conversion, and confirm that the amber result retains the download action and explains that the prepared calendar contains only valid events.
+5. Download the partial calendar and confirm that it contains the valid events but none of the skipped events shown in the result.
+6. Activate the download again and confirm that another valid `.ics` download is initiated. Switch to Italian and confirm that the action reads `Scarica il calendario`.
+7. Convert an all-invalid schedule and confirm that no download action appears. Activate `Reimposta` or choose another file and confirm that the previous result and its download action disappear.
+8. Resize the browser to approximately 320 px and confirm that the download action fits the result panel without horizontal scrolling. Stop both development servers with `Ctrl+C` only if you started them in step 1.
+
+### TASK-025 - Add inline help and sample access
+
+**Ask**: Add concise German and Italian guidance covering:
+
+1. Select or drop a CSV/XLSX schedule.
+2. Start conversion and review skipped events.
+3. Download and import the generated ICS calendar.
+
+Also provide:
+
+- Accepted formats.
+- The 10 MiB limit.
+- A link to the example XLSX schedule.
+- A short explanation of partial conversion.
+- A reminder that uploads are not retained.
+
+Before implementation, verify how the existing sample asset is delivered. The frontend should link to one stable application URL rather than duplicate the XLSX file in multiple directories.
+
+**Answer:** Added a bilingual inline-help panel beside the upload workflow with the three numbered conversion steps, accepted CSV/XLSX formats, 10 MiB limit, partial-result behavior, and local non-retention reminder. Added German and Italian sample-download labels and one stable `/api/v1/tools/calendar-converter/example` URL. The FastAPI route streams the existing version-controlled `assets/examples/calendar_schedule_example.xlsx` with its XLSX MIME type and attachment filename; no frontend or runtime copy was created. Applied responsive help-panel styling so it sits beside the form on desktop and stacks before it on narrow layouts. Verified that the real browser download is byte-for-byte identical to the source asset.
+
+**Automated test:**
+
+1. From the repository root, run `backend/.venv/bin/python -m pytest backend/tests/test_sample_schedule.py -vv` and confirm that all five sample storage, structure, conversion, stable-download, and upload tests pass.
+2. Run `cd frontend && ./node_modules/.bin/vitest run src/styles.test.ts src/i18n/translations.test.ts src/App.test.tsx src/pages/DashboardPage.test.tsx src/pages/CalendarConverterPage.test.tsx` and confirm that all 42 focused help, result, translation, design, accessibility, and component tests pass.
+3. From `frontend/`, run `./node_modules/.bin/tsc -b && ./node_modules/.bin/vite build` and confirm that strict TypeScript checking and the production build complete successfully.
+4. Return to the repository root, run `make test`, and confirm that 71 backend tests and 54 frontend tests pass.
+5. Run `find . -type f -name 'calendar_schedule_example.xlsx' -print` and confirm that only `./assets/examples/calendar_schedule_example.xlsx` is reported.
+6. Run `backend/.venv/bin/python -m pip check` and confirm that it reports `No broken requirements found.`, then run `git diff --check` and confirm that it produces no output.
+
+**Developer demo:**
+
+1. From the repository root, run `make dev` if the development servers are not already running, then open `http://127.0.0.1:5173/tools/calendar-converter`.
+2. Confirm that `So funktioniert die Konvertierung` shows the three numbered steps plus formats, the 10 MiB limit, partial-conversion guidance, and the non-retention reminder.
+3. Activate `XLSX-Beispieldienstplan herunterladen` and confirm that the browser downloads `calendar_schedule_example.xlsx`.
+4. Select `Italiano` and confirm that the full help panel and `Scarica il piano dei turni XLSX di esempio` are translated while the sample URL remains unchanged.
+5. Resize to approximately 320 px and confirm that help and upload sections stack without clipped text or horizontal scrolling. Resize to desktop width and confirm that they appear side by side.
+6. Stop both development servers with `Ctrl+C` only if you started them in step 1.
+
+### TASK-026 - Verify step 5 end to end
+
+**Ask**: Complete a focused UI-quality pass covering:
+
+- German and Italian content.
+- Keyboard-only upload and conversion.
+- Focus movement after success, partial result, all-invalid result, and fatal error.
+- Screen-reader announcements.
+- Visible focus indicators.
+- Success, warning, and error contrast.
+- 44 px touch targets.
+- 320 px phone layout.
+- Desktop layout.
+- 200% zoom.
+- Reduced motion.
+- Successful ICS download.
+- Partial-result ICS download.
+- No download for all-invalid input.
+- Example-schedule access.
+- No generated `.ics` files left in the repository.
+
+Use component tests for deterministic state and accessibility behavior, followed by a real browser walkthrough through `make dev`.
+
+**Answer:** Completed the focused step-5 quality pass across deterministic component coverage and the live application. Confirmed complete German/Italian content, native file-input and button semantics, polite progress/result announcements, alert semantics, and focus movement to success, partial, all-invalid, and fatal headings. The audit found and fixed a stale direct-child CSS selector so every nested result heading now receives the intended visible focus ring. Measured success, warning, and error text contrast at 7.15:1, 7.58:1, and 8.86:1; visible controls resolve to the shared 44 px target within browser subpixel rounding. Verified desktop, phone, and effective-200%-zoom reflow without horizontal overflow, reduced-motion CSS, successful and valid-only partial download behavior, no all-invalid download, byte-identical example access, and no generated `.ics` files in the repository. The browser-control surface could not synthesize keyboard activation of the operating system file picker, so the final physical-keyboard picker activation remains listed in the developer demo; the accessibility tree and tests confirm that the labelled native input is the sole keyboard upload control.
+
+**Automated test:**
+
+1. From the repository root, run `cd frontend && ./node_modules/.bin/vitest run src/styles.test.ts src/i18n/translations.test.ts src/App.test.tsx src/pages/DashboardPage.test.tsx src/pages/CalendarConverterPage.test.tsx` and confirm that all 42 focused state, focus, announcement, translation, responsive-style, download, and help tests pass.
+2. From `frontend/`, run `./node_modules/.bin/tsc -b && ./node_modules/.bin/vite build` and confirm that strict TypeScript checking and the production build complete successfully.
+3. Return to the repository root, run `make test`, and confirm that 71 backend tests and 54 frontend tests pass.
+4. Run `backend/.venv/bin/python -m pip check` and confirm that it reports `No broken requirements found.`
+5. Run `find . -path './.git' -prune -o -name '*.ics' -print` and confirm that it produces no output.
+6. Run `find . -type f -name 'calendar_schedule_example.xlsx' -print` and confirm that exactly one repository sample is reported.
+7. Run `git diff --check` and confirm that it produces no output and exits successfully.
+
+**Developer demo:**
+
+1. From the repository root, run `make dev`, then open `http://127.0.0.1:5173/tools/calendar-converter` in a browser at desktop width.
+2. Using only `Tab`, `Shift+Tab`, `Enter`, and `Space`, follow the skip link, switch languages, download the example, open the native file picker, select a supported schedule, and start conversion. Confirm that focus is always visible and the drop zone itself is not an extra tab stop.
+3. With a screen reader or accessibility inspector, confirm that conversion progress is announced and that completed results use a named status region; confirm that fatal errors use an alert.
+4. Convert successful, partially valid, all-invalid, and unsupported or malformed schedules. Confirm focus moves to each outcome heading, partial results retain valid-only download guidance, and all-invalid results have no download action.
+5. Download successful and partial calendars. Confirm the successful file contains all valid events and the partial file contains only its valid events. Download and open the example XLSX from the help panel.
+6. Switch between German and Italian after a result and confirm that all visible help, result, issue, and action text changes without losing the result.
+7. Check 320 px phone width, desktop width, and 200% browser zoom. Confirm there is no horizontal scrolling, clipping, or overlap and that controls remain at least 44 px.
+8. Enable reduced-motion preference and confirm that hover/focus layout remains stable without visible movement. Stop both development servers with `Ctrl+C`.

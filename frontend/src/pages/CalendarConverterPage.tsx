@@ -2,6 +2,7 @@ import {
   type ChangeEvent,
   type DragEvent,
   type FormEvent,
+  useEffect,
   useRef,
   useState,
 } from "react";
@@ -9,11 +10,17 @@ import { Link } from "react-router-dom";
 
 import {
   type ApiErrorCode,
+  type Calendar,
   type ConversionResponse,
   convertCalendar,
   type InvalidEvent,
 } from "../api/calendarConverter";
 import { useI18n } from "../i18n/I18nProvider";
+
+export const EXAMPLE_SCHEDULE_URL =
+  "/api/v1/tools/calendar-converter/example";
+export const EXAMPLE_SCHEDULE_FILENAME =
+  "calendar_schedule_example.xlsx";
 
 export type ConverterState =
   | { status: "idle" }
@@ -25,10 +32,25 @@ export type ConverterState =
 export function CalendarConverterPage() {
   const { t, translateApiError, translateConverterIssue } = useI18n();
   const inputRef = useRef<HTMLInputElement>(null);
+  const outcomeHeadingRef = useRef<HTMLHeadingElement>(null);
   const [workflow, setWorkflow] = useState<ConverterState>({ status: "idle" });
   const [isDragging, setIsDragging] = useState(false);
   const isConverting = workflow.status === "converting";
   const selectedFile = getStateFile(workflow);
+  const hasFileValidationError =
+    workflow.status === "fatal" && workflow.file === undefined;
+  const fileDescriptionIds = [
+    "calendar-file-requirements",
+    hasFileValidationError ? "calendar-file-validation" : null,
+  ]
+    .filter((id): id is string => id !== null)
+    .join(" ");
+
+  useEffect(() => {
+    if (workflow.status === "result" || workflow.status === "fatal") {
+      outcomeHeadingRef.current?.focus();
+    }
+  }, [workflow]);
 
   function selectFile(file: File | null) {
     if (file === null) {
@@ -81,6 +103,7 @@ export function CalendarConverterPage() {
     selectFile(null);
     if (inputRef.current !== null) {
       inputRef.current.value = "";
+      inputRef.current.focus();
     }
   }
 
@@ -123,73 +146,135 @@ export function CalendarConverterPage() {
       <h1 id="converter-title">{t("calendarTitle")}</h1>
       <p>{t("calendarUploadIntro")}</p>
 
-      <form className="upload-form" onSubmit={handleSubmit}>
-        <div
-          className={`drop-zone${isDragging ? " dragging" : ""}`}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
+      <div className="converter-workspace">
+        <aside
+          className="converter-help"
+          aria-labelledby="calendar-help-title"
         >
-          <p className="drop-zone-title">{t("calendarDropTitle")}</p>
-          <p>{t("calendarDropHint")}</p>
-          <input
-            ref={inputRef}
-            className="visually-hidden"
-            id="calendar-schedule-file"
-            type="file"
-            accept=".csv,.xlsx"
-            disabled={isConverting}
-            onChange={handleFileChange}
-          />
-          <label
-            className="file-picker-button"
-            htmlFor="calendar-schedule-file"
-            aria-disabled={isConverting}
+          <h2 id="calendar-help-title">{t("calendarHelpTitle")}</h2>
+          <ol className="workflow-steps">
+            <li>{t("calendarHelpStepSelect")}</li>
+            <li>{t("calendarHelpStepConvert")}</li>
+            <li>{t("calendarHelpStepDownload")}</li>
+          </ol>
+          <ul className="help-details">
+            <li>{t("calendarHelpFormats")}</li>
+            <li>{t("calendarHelpLimit")}</li>
+            <li>{t("calendarHelpPartial")}</li>
+            <li>{t("calendarHelpPrivacy")}</li>
+          </ul>
+          <a
+            className="text-link example-download-link"
+            href={EXAMPLE_SCHEDULE_URL}
+            download={EXAMPLE_SCHEDULE_FILENAME}
           >
-            {selectedFile === null
-              ? t("calendarChooseFile")
-              : t("calendarChooseAnother")}
-          </label>
-          <p className="file-requirements">{t("calendarFileRequirements")}</p>
-        </div>
+            {t("calendarExampleDownload")}
+          </a>
+        </aside>
 
-        {selectedFile !== null ? (
-          <div className="selected-file" aria-live="polite">
-            <span>{t("calendarSelectedFile")}</span>
-            <strong>{selectedFile.name}</strong>
+        <form className="upload-form" onSubmit={handleSubmit}>
+          <div
+            className={`drop-zone${isDragging ? " dragging" : ""}`}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
+            <p className="drop-zone-title">{t("calendarDropTitle")}</p>
+            <p>{t("calendarDropHint")}</p>
+            <input
+              ref={inputRef}
+              className="visually-hidden"
+              id="calendar-schedule-file"
+              type="file"
+              accept=".csv,.xlsx"
+              aria-describedby={fileDescriptionIds}
+              disabled={isConverting}
+              onChange={handleFileChange}
+            />
+            <label
+              className="file-picker-button"
+              htmlFor="calendar-schedule-file"
+              aria-disabled={isConverting}
+            >
+              {selectedFile === null
+                ? t("calendarChooseFile")
+                : t("calendarChooseAnother")}
+            </label>
+            <p
+              className="file-requirements"
+              id="calendar-file-requirements"
+            >
+              {t("calendarFileRequirements")}
+            </p>
           </div>
-        ) : null}
 
-        {workflow.status === "result" ? (
-          <ConversionResultPanel result={workflow.result} />
-        ) : null}
-        {workflow.status === "fatal" ? (
-          <section className="result-panel fatal-result" role="alert">
-            <h2>{t("calendarFatalTitle")}</h2>
-            <p>{translateApiError(workflow.errorCode)}</p>
-          </section>
-        ) : null}
+          {isConverting ? (
+            <p
+              className="visually-hidden"
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+            >
+              {t("calendarConverting")}
+            </p>
+          ) : null}
 
-        <div className="form-actions">
-          <button
-            className="primary-button"
-            type="submit"
-            disabled={workflow.status !== "selected"}
-          >
-            {isConverting
-              ? t("calendarConverting")
-              : t("calendarSubmit")}
-          </button>
-          <button
-            className="secondary-button"
-            type="button"
-            disabled={workflow.status === "idle" || isConverting}
-            onClick={resetWorkflow}
-          >
-            {t("calendarReset")}
-          </button>
-        </div>
-      </form>
+          {selectedFile !== null ? (
+            <div className="selected-file" aria-live="polite">
+              <span>{t("calendarSelectedFile")}</span>
+              <strong>{selectedFile.name}</strong>
+            </div>
+          ) : null}
+
+          {workflow.status === "result" ? (
+            <ConversionResultPanel result={workflow.result} />
+          ) : null}
+          {workflow.status === "fatal" ? (
+            <section
+              className="result-panel fatal-result"
+              role="alert"
+              aria-labelledby="calendar-fatal-title"
+            >
+              <h2
+                id="calendar-fatal-title"
+                ref={outcomeHeadingRef}
+                tabIndex={-1}
+              >
+                {t("calendarFatalTitle")}
+              </h2>
+              <p
+                id={
+                  hasFileValidationError
+                    ? "calendar-file-validation"
+                    : undefined
+                }
+              >
+                {translateApiError(workflow.errorCode)}
+              </p>
+            </section>
+          ) : null}
+
+          <div className="form-actions">
+            <button
+              className="primary-button"
+              type="submit"
+              disabled={workflow.status !== "selected"}
+            >
+              {isConverting
+                ? t("calendarConverting")
+                : t("calendarSubmit")}
+            </button>
+            <button
+              className="secondary-button"
+              type="button"
+              disabled={workflow.status === "idle" || isConverting}
+              onClick={resetWorkflow}
+            >
+              {t("calendarReset")}
+            </button>
+          </div>
+        </form>
+      </div>
 
       <Link className="text-link" to="/">
         {t("backToDashboard")}
@@ -198,6 +283,7 @@ export function CalendarConverterPage() {
   );
 
   function ConversionResultPanel({ result }: { result: ConversionResponse }) {
+    const calendar = result.calendar;
     const titleKey =
       result.status === "success"
         ? "calendarSuccessTitle"
@@ -210,15 +296,47 @@ export function CalendarConverterPage() {
         : result.status === "partial"
           ? "calendarPartialDescription"
           : "calendarFailureDescription";
+    const statusLabelKey =
+      result.status === "success"
+        ? "calendarStatusSuccess"
+        : result.status === "partial"
+          ? "calendarStatusPartial"
+          : "calendarStatusFailure";
 
     return (
       <section
         className={`result-panel ${result.status}-result`}
         role="status"
+        aria-labelledby="calendar-result-title"
       >
-        <h2>{t(titleKey)}</h2>
+        <div className="result-heading">
+          <span className="result-status-label">{t(statusLabelKey)}</span>
+          <h2
+            id="calendar-result-title"
+            ref={outcomeHeadingRef}
+            tabIndex={-1}
+          >
+            {t(titleKey)}
+          </h2>
+        </div>
         <p>{t(descriptionKey)}</p>
+
+        {result.status === "partial" ? (
+          <p className="result-guidance partial-calendar-notice">
+            {t("calendarPartialValidOnly")}
+          </p>
+        ) : null}
+        {result.status === "failure" ? (
+          <p className="result-guidance no-calendar-notice">
+            {t("calendarFailureNoCalendar")}
+          </p>
+        ) : null}
+
         <dl className="result-counts">
+          <div>
+            <dt>{t("calendarTotalCount")}</dt>
+            <dd>{result.total_count}</dd>
+          </div>
           <div>
             <dt>{t("calendarConvertedCount")}</dt>
             <dd>{result.converted_count}</dd>
@@ -229,11 +347,20 @@ export function CalendarConverterPage() {
           </div>
         </dl>
 
-        {result.calendar !== null ? (
-          <p className="calendar-result-file">
-            <span>{t("calendarResultFilename")}</span>
-            <strong>{result.calendar.filename}</strong>
-          </p>
+        {calendar !== null ? (
+          <div className="calendar-result">
+            <p className="calendar-result-file">
+              <span>{t("calendarResultFilename")}</span>
+              <strong>{calendar.filename}</strong>
+            </p>
+            <button
+              className="primary-button calendar-download-button"
+              type="button"
+              onClick={() => downloadCalendar(calendar)}
+            >
+              {t("calendarDownload")}
+            </button>
+          </div>
         ) : null}
 
         {result.invalid_events.length > 0 ? (
@@ -261,20 +388,47 @@ export function CalendarConverterPage() {
 
     return (
       <li>
-        <strong>{eventName}</strong>
+        <div className="invalid-event-header">
+          <strong>{eventName}</strong>
+          <span className="skipped-event-label">
+            {t("calendarSkippedEventLabel")}
+          </span>
+        </div>
         <span className="event-source">
           {t("calendarRowLabel")} {event.source_position.row}
           {event.source_position.worksheet === null
             ? null
             : ` · ${t("calendarWorksheetLabel")} ${event.source_position.worksheet}`}
         </span>
-        <ul>
-          {event.issue_codes.map((code) => (
-            <li key={code}>{translateConverterIssue(code)}</li>
-          ))}
-        </ul>
+        <div className="invalid-event-issues">
+          <span>{t("calendarEventIssuesLabel")}</span>
+          <ul>
+            {event.issue_codes.map((code) => (
+              <li key={code}>{translateConverterIssue(code)}</li>
+            ))}
+          </ul>
+        </div>
       </li>
     );
+  }
+}
+
+export function downloadCalendar(calendar: Calendar): void {
+  const blob = new Blob([calendar.ics_text], {
+    type: calendar.mime_type,
+  });
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = objectUrl;
+  link.download = calendar.filename;
+  link.hidden = true;
+  document.body.append(link);
+
+  try {
+    link.click();
+  } finally {
+    link.remove();
+    URL.revokeObjectURL(objectUrl);
   }
 }
 

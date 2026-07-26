@@ -6,6 +6,7 @@ import type {
 export const germanTranslations = {
   brand: "Feuerwehr Tools",
   brandHomeLabel: "Feuerwehr Tools Startseite",
+  skipToContent: "Zum Hauptinhalt springen",
   navigationLabel: "Hauptnavigation",
   navigationOverview: "Übersicht",
   languageLabel: "Sprache",
@@ -29,6 +30,20 @@ export const germanTranslations = {
   calendarOpen: "Werkzeug öffnen",
   calendarUploadIntro:
     "Wählen Sie einen Dienstplan aus und starten Sie die sichere lokale Konvertierung.",
+  calendarHelpTitle: "So funktioniert die Konvertierung",
+  calendarHelpStepSelect:
+    "CSV- oder XLSX-Dienstplan auswählen oder hier ablegen.",
+  calendarHelpStepConvert:
+    "Konvertierung starten und übersprungene Ereignisse prüfen.",
+  calendarHelpStepDownload:
+    "ICS-Kalender herunterladen und in die Kalender-App importieren.",
+  calendarHelpFormats: "Akzeptierte Formate: CSV und XLSX.",
+  calendarHelpLimit: "Maximale Dateigröße: 10 MiB.",
+  calendarHelpPartial:
+    "Bei einer Teilkonvertierung enthält der Kalender nur gültige Ereignisse.",
+  calendarHelpPrivacy:
+    "Uploads und erzeugte Kalender werden von der Anwendung nicht gespeichert.",
+  calendarExampleDownload: "XLSX-Beispieldienstplan herunterladen",
   calendarDropTitle: "Dienstplan hier ablegen",
   calendarDropHint: "Oder wählen Sie eine Datei auf diesem Gerät aus.",
   calendarChooseFile: "Datei auswählen",
@@ -38,20 +53,31 @@ export const germanTranslations = {
   calendarSubmit: "Konvertierung starten",
   calendarConverting: "Wird konvertiert …",
   calendarReset: "Zurücksetzen",
+  calendarStatusSuccess: "Vollständiges Ergebnis",
+  calendarStatusPartial: "Teilergebnis",
+  calendarStatusFailure: "Kein konvertierbares Ergebnis",
   calendarSuccessTitle: "Konvertierung erfolgreich",
   calendarSuccessDescription:
     "Alle Ereignisse wurden konvertiert und der Kalender wurde vorbereitet.",
   calendarPartialTitle: "Teilweise konvertiert",
   calendarPartialDescription:
     "Gültige Ereignisse wurden konvertiert. Ungültige Ereignisse wurden übersprungen.",
+  calendarPartialValidOnly:
+    "Die vorbereitete Kalenderdatei enthält ausschließlich gültige Ereignisse.",
   calendarFailureTitle: "Keine Ereignisse konvertiert",
   calendarFailureDescription:
     "Der Dienstplan wurde verarbeitet, aber alle Ereignisse waren ungültig.",
+  calendarFailureNoCalendar:
+    "Es wurde keine Kalenderdatei erstellt.",
   calendarFatalTitle: "Konvertierung nicht möglich",
+  calendarTotalCount: "Ereignisse insgesamt",
   calendarConvertedCount: "Konvertierte Ereignisse",
   calendarSkippedCount: "Übersprungene Ereignisse",
   calendarResultFilename: "Vorbereitete Kalenderdatei",
+  calendarDownload: "Kalender herunterladen",
   calendarInvalidEventsTitle: "Probleme im Dienstplan",
+  calendarSkippedEventLabel: "Übersprungen",
+  calendarEventIssuesLabel: "Probleme",
   calendarEventFallback: "Ereignis",
   calendarRowLabel: "Zeile",
   calendarWorksheetLabel: "Arbeitsblatt",
@@ -75,6 +101,7 @@ export type TranslationDictionary = Record<TranslationKey, string>;
 export const italianTranslations = {
   brand: "Feuerwehr Tools",
   brandHomeLabel: "Pagina iniziale di Feuerwehr Tools",
+  skipToContent: "Vai al contenuto principale",
   navigationLabel: "Navigazione principale",
   navigationOverview: "Panoramica",
   languageLabel: "Lingua",
@@ -98,6 +125,20 @@ export const italianTranslations = {
   calendarOpen: "Apri lo strumento",
   calendarUploadIntro:
     "Seleziona un piano dei turni e avvia la conversione locale sicura.",
+  calendarHelpTitle: "Come funziona la conversione",
+  calendarHelpStepSelect:
+    "Seleziona o trascina qui un piano dei turni CSV o XLSX.",
+  calendarHelpStepConvert:
+    "Avvia la conversione e controlla gli eventi ignorati.",
+  calendarHelpStepDownload:
+    "Scarica il calendario ICS e importalo nell'applicazione calendario.",
+  calendarHelpFormats: "Formati accettati: CSV e XLSX.",
+  calendarHelpLimit: "Dimensione massima del file: 10 MiB.",
+  calendarHelpPartial:
+    "In una conversione parziale, il calendario contiene soltanto gli eventi validi.",
+  calendarHelpPrivacy:
+    "I caricamenti e i calendari generati non vengono salvati dall'applicazione.",
+  calendarExampleDownload: "Scarica il piano dei turni XLSX di esempio",
   calendarDropTitle: "Trascina qui il piano dei turni",
   calendarDropHint: "Oppure scegli un file da questo dispositivo.",
   calendarChooseFile: "Scegli un file",
@@ -107,20 +148,31 @@ export const italianTranslations = {
   calendarSubmit: "Avvia la conversione",
   calendarConverting: "Conversione in corso …",
   calendarReset: "Reimposta",
+  calendarStatusSuccess: "Risultato completo",
+  calendarStatusPartial: "Risultato parziale",
+  calendarStatusFailure: "Nessun risultato convertibile",
   calendarSuccessTitle: "Conversione completata",
   calendarSuccessDescription:
     "Tutti gli eventi sono stati convertiti e il calendario è stato preparato.",
   calendarPartialTitle: "Conversione parziale",
   calendarPartialDescription:
     "Gli eventi validi sono stati convertiti. Gli eventi non validi sono stati ignorati.",
+  calendarPartialValidOnly:
+    "Il file calendario preparato contiene esclusivamente gli eventi validi.",
   calendarFailureTitle: "Nessun evento convertito",
   calendarFailureDescription:
     "Il piano dei turni è stato elaborato, ma tutti gli eventi erano non validi.",
+  calendarFailureNoCalendar:
+    "Non è stato creato alcun file calendario.",
   calendarFatalTitle: "Conversione non disponibile",
+  calendarTotalCount: "Eventi totali",
   calendarConvertedCount: "Eventi convertiti",
   calendarSkippedCount: "Eventi ignorati",
   calendarResultFilename: "File calendario preparato",
+  calendarDownload: "Scarica il calendario",
   calendarInvalidEventsTitle: "Problemi nel piano dei turni",
+  calendarSkippedEventLabel: "Ignorato",
+  calendarEventIssuesLabel: "Problemi",
   calendarEventFallback: "Evento",
   calendarRowLabel: "Riga",
   calendarWorksheetLabel: "Foglio",

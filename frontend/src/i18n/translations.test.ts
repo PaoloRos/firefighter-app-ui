@@ -35,4 +35,45 @@ describe("translation dictionaries", () => {
       "più volte",
     );
   });
+
+  it("provides bilingual partial and all-invalid guidance", () => {
+    expect(germanTranslations.calendarPartialValidOnly).toContain(
+      "ausschließlich gültige",
+    );
+    expect(italianTranslations.calendarPartialValidOnly).toContain(
+      "esclusivamente",
+    );
+    expect(germanTranslations.calendarFailureNoCalendar).toContain(
+      "keine Kalenderdatei",
+    );
+    expect(italianTranslations.calendarFailureNoCalendar).toContain(
+      "alcun file calendario",
+    );
+  });
+
+  it("provides a bilingual calendar download action", () => {
+    expect(germanTranslations.calendarDownload).toBe(
+      "Kalender herunterladen",
+    );
+    expect(italianTranslations.calendarDownload).toBe(
+      "Scarica il calendario",
+    );
+  });
+
+  it("provides complete bilingual workflow and privacy help", () => {
+    for (const dictionary of [
+      germanTranslations,
+      italianTranslations,
+    ]) {
+      expect(dictionary.calendarHelpStepSelect).toMatch(
+        /CSV.*XLSX|XLSX.*CSV/,
+      );
+      expect(dictionary.calendarHelpStepConvert).toBeTruthy();
+      expect(dictionary.calendarHelpStepDownload).toContain("ICS");
+      expect(dictionary.calendarHelpLimit).toContain("10 MiB");
+      expect(dictionary.calendarHelpPartial).toBeTruthy();
+      expect(dictionary.calendarHelpPrivacy).toBeTruthy();
+      expect(dictionary.calendarExampleDownload).toContain("XLSX");
+    }
+  });
 });

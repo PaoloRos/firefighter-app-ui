@@ -1,6 +1,18 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 import {
   type ApiErrorCode,
@@ -21,6 +33,14 @@ vi.mock("../api/calendarConverter", async (importOriginal) => {
 });
 
 const mockedConvertCalendar = vi.mocked(convertCalendar);
+const originalCreateObjectUrl = Object.getOwnPropertyDescriptor(
+  URL,
+  "createObjectURL",
+);
+const originalRevokeObjectUrl = Object.getOwnPropertyDescriptor(
+  URL,
+  "revokeObjectURL",
+);
 
 function renderConverter() {
   return render(
@@ -38,16 +58,62 @@ describe("calendar converter upload workflow", () => {
     mockedConvertCalendar.mockResolvedValue(successfulResult());
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+    restoreProperty(URL, "createObjectURL", originalCreateObjectUrl);
+    restoreProperty(URL, "revokeObjectURL", originalRevokeObjectUrl);
+  });
+
   it("starts with an extension-filtered picker and disabled actions", () => {
     renderConverter();
 
     const input = screen.getByLabelText("Datei auswählen");
     expect(input).toHaveAttribute("type", "file");
     expect(input).toHaveAttribute("accept", ".csv,.xlsx");
+    expect(input).toHaveAccessibleDescription(
+      "Akzeptiert werden CSV- und XLSX-Dateien.",
+    );
     expect(
       screen.getByRole("button", { name: "Konvertierung starten" }),
     ).toBeDisabled();
     expect(screen.getByRole("button", { name: "Zurücksetzen" })).toBeDisabled();
+  });
+
+  it("shows bilingual-ready inline help and one stable sample URL", () => {
+    renderConverter();
+
+    expect(
+      screen.getByRole("complementary", {
+        name: "So funktioniert die Konvertierung",
+      }),
+    ).toBeVisible();
+    expect(
+      screen.getByText(
+        "CSV- oder XLSX-Dienstplan auswählen oder hier ablegen.",
+      ),
+    ).toBeVisible();
+    expect(screen.getByText("Maximale Dateigröße: 10 MiB.")).toBeVisible();
+    expect(
+      screen.getByText(
+        "Bei einer Teilkonvertierung enthält der Kalender nur gültige Ereignisse.",
+      ),
+    ).toBeVisible();
+    expect(
+      screen.getByText(
+        "Uploads und erzeugte Kalender werden von der Anwendung nicht gespeichert.",
+      ),
+    ).toBeVisible();
+    const exampleLink = screen.getByRole("link", {
+      name: "XLSX-Beispieldienstplan herunterladen",
+    });
+    expect(exampleLink).toHaveAttribute(
+      "href",
+      "/api/v1/tools/calendar-converter/example",
+    );
+    expect(exampleLink).toHaveAttribute(
+      "download",
+      "calendar_schedule_example.xlsx",
+    );
   });
 
   it("selects supported files and resets the workflow", () => {
@@ -85,6 +151,15 @@ describe("calendar converter upload workflow", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(
       "Es werden nur CSV- und XLSX-Dateien unterstützt.",
     );
+    expect(screen.getByLabelText("Datei auswählen")).toHaveAccessibleDescription(
+      "Akzeptiert werden CSV- und XLSX-Dateien. Es werden nur CSV- und XLSX-Dateien unterstützt.",
+    );
+    expect(
+      screen.getByRole("heading", {
+        level: 2,
+        name: "Konvertierung nicht möglich",
+      }),
+    ).toHaveFocus();
     expect(
       screen.getByRole("button", { name: "Konvertierung starten" }),
     ).toBeDisabled();
@@ -98,6 +173,8 @@ describe("calendar converter upload workflow", () => {
     if (dropZone === null) {
       throw new Error("Expected the upload drop zone");
     }
+    expect(dropZone).not.toHaveAttribute("role", "button");
+    expect(dropZone).not.toHaveAttribute("tabindex");
     const file = new File(["schedule"], "schedule.xlsx", {
       type:
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -143,6 +220,9 @@ describe("calendar converter upload workflow", () => {
     expect(
       screen.getByRole("button", { name: "Wird konvertiert …" }),
     ).toBeDisabled();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Wird konvertiert …",
+    );
     expect(screen.getByText("Andere Datei auswählen")).toHaveAttribute(
       "aria-disabled",
       "true",
@@ -151,11 +231,55 @@ describe("calendar converter upload workflow", () => {
 
     resolveConversion?.(successfulResult());
 
-    const result = await screen.findByRole("status");
+    const result = await screen.findByRole("status", {
+      name: "Konvertierung erfolgreich",
+    });
     expect(result).toHaveTextContent("Konvertierung erfolgreich");
     expect(result).toHaveTextContent("Konvertierte Ereignisse");
     expect(result).toHaveTextContent("1");
     expect(result).toHaveTextContent("schedule.ics");
+    await waitFor(() => {
+      expect(
+        screen.getByRole("heading", {
+          level: 2,
+          name: "Konvertierung erfolgreich",
+        }),
+      ).toHaveFocus();
+    });
+  });
+
+  it("downloads a successful calendar with its response filename and MIME type", async () => {
+    const downloads = observeCalendarDownloads();
+    renderConverter();
+    selectSchedule("schedule.csv");
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Konvertierung starten" }),
+    );
+
+    await screen.findByRole("status", {
+      name: "Konvertierung erfolgreich",
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Kalender herunterladen" }),
+    );
+
+    expect(downloads.createObjectUrl).toHaveBeenCalledOnce();
+    const blob = downloads.createObjectUrl.mock.calls[0]?.[0];
+    expect(blob).toBeInstanceOf(Blob);
+    expect(blob?.type).toBe("text/calendar;charset=utf-8");
+    expect(await readBlob(blob)).toBe(
+      "BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n",
+    );
+    expect(downloads.clickedLinks).toEqual([
+      {
+        download: "schedule.ics",
+        href: "blob:calendar-download-1",
+      },
+    ]);
+    expect(downloads.revokeObjectUrl).toHaveBeenCalledWith(
+      "blob:calendar-download-1",
+    );
   });
 
   it("renders a translated partial result and each skipped-event issue", async () => {
@@ -167,14 +291,70 @@ describe("calendar converter upload workflow", () => {
       screen.getByRole("button", { name: "Konvertierung starten" }),
     );
 
-    const result = await screen.findByRole("status");
+    const result = await screen.findByRole("status", {
+      name: "Teilweise konvertiert",
+    });
+    expect(result).toHaveTextContent("Teilergebnis");
+    expect(result).toHaveTextContent("Ereignisse insgesamt");
     expect(result).toHaveTextContent("Teilweise konvertiert");
     expect(result).toHaveTextContent("Konvertierte Ereignisse");
     expect(result).toHaveTextContent("Übersprungene Ereignisse");
+    expect(result).toHaveTextContent(
+      "Die vorbereitete Kalenderdatei enthält ausschließlich gültige Ereignisse.",
+    );
     expect(result).toHaveTextContent("Übung ohne Kennung");
+    expect(result).toHaveTextContent("Übersprungen");
     expect(result).toHaveTextContent("Zeile 3 · Arbeitsblatt Juli");
+    expect(result).toHaveTextContent("Probleme");
     expect(result).toHaveTextContent("Die Ereignis-ID fehlt.");
     expect(result).toHaveTextContent("mixed.ics");
+    expect(
+      screen.getByRole("button", { name: "Kalender herunterladen" }),
+    ).toBeEnabled();
+    await waitFor(() => {
+      expect(
+        screen.getByRole("heading", {
+          level: 2,
+          name: "Teilweise konvertiert",
+        }),
+      ).toHaveFocus();
+    });
+  });
+
+  it("allows a partial calendar to be downloaded repeatedly without retaining object URLs", async () => {
+    const downloads = observeCalendarDownloads();
+    mockedConvertCalendar.mockResolvedValue(partialResult());
+    renderConverter();
+    selectSchedule("mixed.xlsx");
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Konvertierung starten" }),
+    );
+
+    await screen.findByRole("status", {
+      name: "Teilweise konvertiert",
+    });
+    const downloadButton = screen.getByRole("button", {
+      name: "Kalender herunterladen",
+    });
+    fireEvent.click(downloadButton);
+    fireEvent.click(downloadButton);
+
+    expect(downloads.createObjectUrl).toHaveBeenCalledTimes(2);
+    expect(downloads.clickedLinks).toEqual([
+      {
+        download: "mixed.ics",
+        href: "blob:calendar-download-1",
+      },
+      {
+        download: "mixed.ics",
+        href: "blob:calendar-download-2",
+      },
+    ]);
+    expect(downloads.revokeObjectUrl.mock.calls).toEqual([
+      ["blob:calendar-download-1"],
+      ["blob:calendar-download-2"],
+    ]);
   });
 
   it("keeps an all-invalid result distinct from a fatal error", async () => {
@@ -186,14 +366,30 @@ describe("calendar converter upload workflow", () => {
       screen.getByRole("button", { name: "Konvertierung starten" }),
     );
 
-    const result = await screen.findByRole("status");
+    const result = await screen.findByRole("status", {
+      name: "Keine Ereignisse konvertiert",
+    });
     expect(result).toHaveTextContent("Keine Ereignisse konvertiert");
     expect(result).toHaveTextContent("alle Ereignisse waren ungültig");
+    expect(result).toHaveTextContent(
+      "Es wurde keine Kalenderdatei erstellt.",
+    );
     expect(result).toHaveTextContent("Die Zusammenfassung fehlt.");
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(
       screen.queryByText("Vorbereitete Kalenderdatei"),
     ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Kalender herunterladen" }),
+    ).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(
+        screen.getByRole("heading", {
+          level: 2,
+          name: "Keine Ereignisse konvertiert",
+        }),
+      ).toHaveFocus();
+    });
   });
 
   it.each([
@@ -221,6 +417,14 @@ describe("calendar converter upload workflow", () => {
       expect(alert).not.toHaveTextContent("unsafe backend detail");
       expect(screen.getByText("schedule.csv")).toBeVisible();
       expect(screen.getByText("Andere Datei auswählen")).toBeVisible();
+      await waitFor(() => {
+        expect(
+          screen.getByRole("heading", {
+            level: 2,
+            name: "Konvertierung nicht möglich",
+          }),
+        ).toHaveFocus();
+      });
     },
   );
 
@@ -246,7 +450,12 @@ describe("calendar converter upload workflow", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "Konvertierung starten" }),
     );
-    await screen.findByRole("status");
+    await screen.findByRole("status", {
+      name: "Konvertierung erfolgreich",
+    });
+    expect(
+      screen.getByRole("button", { name: "Kalender herunterladen" }),
+    ).toBeVisible();
 
     fireEvent.change(screen.getByLabelText("Andere Datei auswählen"), {
       target: {
@@ -255,6 +464,9 @@ describe("calendar converter upload workflow", () => {
     });
 
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Kalender herunterladen" }),
+    ).not.toBeInTheDocument();
     expect(screen.getByText("replacement.xlsx")).toBeVisible();
     expect(
       screen.getByRole("button", { name: "Konvertierung starten" }),
@@ -266,6 +478,7 @@ describe("calendar converter upload workflow", () => {
     expect(
       screen.getByRole("button", { name: "Konvertierung starten" }),
     ).toBeDisabled();
+    expect(screen.getByLabelText("Datei auswählen")).toHaveFocus();
   });
 
   it("translates selection, validation, and results into Italian", async () => {
@@ -294,11 +507,37 @@ describe("calendar converter upload workflow", () => {
       screen.getByRole("button", { name: "Avvia la conversione" }),
     );
 
-    const result = await screen.findByRole("status");
+    const result = await screen.findByRole("status", {
+      name: "Conversione parziale",
+    });
     expect(result).toHaveTextContent("Conversione parziale");
+    expect(result).toHaveTextContent("Risultato parziale");
+    expect(result).toHaveTextContent("Eventi totali");
     expect(result).toHaveTextContent("Eventi convertiti");
     expect(result).toHaveTextContent("Eventi ignorati");
+    expect(result).toHaveTextContent(
+      "Il file calendario preparato contiene esclusivamente gli eventi validi.",
+    );
+    expect(result).toHaveTextContent("Ignorato");
     expect(result).toHaveTextContent("Manca l'ID dell'evento.");
+    expect(
+      screen.getByRole("button", { name: "Scarica il calendario" }),
+    ).toBeEnabled();
+    expect(
+      screen.getByRole("complementary", {
+        name: "Come funziona la conversione",
+      }),
+    ).toHaveTextContent(
+      "I caricamenti e i calendari generati non vengono salvati dall'applicazione.",
+    );
+    expect(
+      screen.getByRole("link", {
+        name: "Scarica il piano dei turni XLSX di esempio",
+      }),
+    ).toHaveAttribute(
+      "href",
+      "/api/v1/tools/calendar-converter/example",
+    );
   });
 
   it("preserves a completed result while switching Italian and German", async () => {
@@ -308,11 +547,15 @@ describe("calendar converter upload workflow", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "Konvertierung starten" }),
     );
-    await screen.findByRole("status");
+    await screen.findByRole("status", {
+      name: "Teilweise konvertiert",
+    });
 
     fireEvent.click(screen.getByRole("button", { name: "Italiano" }));
 
-    expect(screen.getByRole("status")).toHaveTextContent(
+    expect(
+      screen.getByRole("status", { name: "Conversione parziale" }),
+    ).toHaveTextContent(
       "Conversione parziale",
     );
     expect(screen.getByText("mixed.xlsx")).toBeVisible();
@@ -321,7 +564,9 @@ describe("calendar converter upload workflow", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Deutsch" }));
 
-    expect(screen.getByRole("status")).toHaveTextContent(
+    expect(
+      screen.getByRole("status", { name: "Teilweise konvertiert" }),
+    ).toHaveTextContent(
       "Teilweise konvertiert",
     );
     expect(screen.getByText("mixed.xlsx")).toBeVisible();
@@ -342,13 +587,18 @@ describe("calendar converter upload workflow", () => {
         screen.getByRole("button", { name: "Konvertierung starten" }),
       );
 
-      expect(await screen.findByRole("status")).toHaveClass(
+      expect(
+        await screen.findByRole("status", {
+          name: "Teilweise konvertiert",
+        }),
+      ).toHaveClass(
         "result-panel",
         "partial-result",
       );
       expect(container.querySelectorAll(".result-counts > div")).toHaveLength(
-        2,
+        3,
       );
+      expect(container.querySelector(".result-guidance")).not.toBeNull();
       expect(container.querySelector(".invalid-event-list")).not.toBeNull();
       expect(container.querySelector(".form-actions")).not.toBeNull();
       expect(screen.getByText("Andere Datei auswählen")).toBeVisible();
@@ -460,4 +710,62 @@ function conversionResponse(
   response: ConversionResponse,
 ): ConversionResponse {
   return response;
+}
+
+function observeCalendarDownloads() {
+  let objectUrlIndex = 0;
+  const createObjectUrl = vi.fn((_blob: Blob) => {
+    objectUrlIndex += 1;
+    return `blob:calendar-download-${objectUrlIndex}`;
+  });
+  const revokeObjectUrl = vi.fn((_url: string) => undefined);
+  const clickedLinks: { download: string; href: string }[] = [];
+
+  Object.defineProperty(URL, "createObjectURL", {
+    configurable: true,
+    value: createObjectUrl,
+  });
+  Object.defineProperty(URL, "revokeObjectURL", {
+    configurable: true,
+    value: revokeObjectUrl,
+  });
+  vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(
+    function recordDownload(this: HTMLAnchorElement) {
+      clickedLinks.push({
+        download: this.download,
+        href: this.getAttribute("href") ?? "",
+      });
+    },
+  );
+
+  return {
+    clickedLinks,
+    createObjectUrl,
+    revokeObjectUrl,
+  };
+}
+
+function restoreProperty(
+  target: typeof URL,
+  property: "createObjectURL" | "revokeObjectURL",
+  descriptor: PropertyDescriptor | undefined,
+) {
+  if (descriptor === undefined) {
+    Reflect.deleteProperty(target, property);
+    return;
+  }
+  Object.defineProperty(target, property, descriptor);
+}
+
+function readBlob(blob: Blob | undefined): Promise<string> {
+  if (blob === undefined) {
+    throw new Error("Expected a calendar Blob");
+  }
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => resolve(String(reader.result)));
+    reader.addEventListener("error", () => reject(reader.error));
+    reader.readAsText(blob);
+  });
 }

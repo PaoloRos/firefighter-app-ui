@@ -87,6 +87,23 @@ def test_sample_converts_all_events_with_calendar_conversion_v020() -> None:
     assert "LOCATION:Übungsplatz" in result.ics_text
 
 
+def test_sample_is_downloaded_from_one_stable_application_url() -> None:
+    with TestClient(create_app()) as client:
+        response = client.get(
+            "/api/v1/tools/calendar-converter/example",
+        )
+
+    assert response.status_code == 200
+    assert response.content == ASSET_PATH.read_bytes()
+    assert response.headers["content-type"] == (
+        "application/vnd.openxmlformats-officedocument."
+        "spreadsheetml.sheet"
+    )
+    assert response.headers["content-disposition"] == (
+        'attachment; filename="calendar_schedule_example.xlsx"'
+    )
+
+
 def test_endpoint_accepts_the_sample_as_a_successful_upload() -> None:
     with TestClient(create_app()) as client:
         with ASSET_PATH.open("rb") as source:

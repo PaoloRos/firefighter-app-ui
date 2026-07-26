@@ -49,6 +49,9 @@ function AppContent() {
 
   return (
     <div className="app-shell">
+      <a className="skip-link" href="#main-content">
+        {t("skipToContent")}
+      </a>
       <header className="site-header">
         <Link className="brand" to="/" aria-label={t("brandHomeLabel")}>
           <span className="brand-mark" aria-hidden="true">
@@ -66,7 +69,7 @@ function AppContent() {
         </div>
       </header>
 
-      <main className="page-content">
+      <main className="page-content" id="main-content" tabIndex={-1}>
         <Routes>
           <Route path="/" element={<DashboardPage />} />
           <Route path="/tools/calendar-converter" element={<CalendarConverterPage />} />

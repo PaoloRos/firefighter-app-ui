@@ -1,9 +1,9 @@
-"""HTTP endpoint for converting uploaded schedules into calendars."""
+"""HTTP endpoints for converting schedules and downloading the example."""
 
-from pathlib import PurePath
+from pathlib import Path, PurePath
 
 from fastapi import APIRouter, File, UploadFile, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 from firefighter_tools_backend.domain.calendar_conversion import (
     ConversionError,
@@ -27,6 +27,16 @@ from firefighter_tools_backend.services import calendar_conversion
 from firefighter_tools_backend.services.upload_validation import validate_upload
 
 router = APIRouter(prefix="/tools/calendar-converter", tags=["calendar converter"])
+
+_SAMPLE_SCHEDULE_PATH = (
+    Path(__file__).parents[4]
+    / "assets"
+    / "examples"
+    / "calendar_schedule_example.xlsx"
+)
+_SAMPLE_SCHEDULE_MEDIA_TYPE = (
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+)
 
 _UPLOAD_ERRORS = {
     UploadValidationErrorCode.MISSING_FILENAME: (
@@ -73,6 +83,19 @@ _CONVERSION_ERRORS = {
         "The uploaded file could not be read.",
     ),
 }
+
+
+@router.get(
+    "/example",
+    response_class=FileResponse,
+)
+def download_example_schedule() -> FileResponse:
+    """Download the version-controlled example schedule without copying it."""
+    return FileResponse(
+        _SAMPLE_SCHEDULE_PATH,
+        media_type=_SAMPLE_SCHEDULE_MEDIA_TYPE,
+        filename=_SAMPLE_SCHEDULE_PATH.name,
+    )
 
 
 @router.post(

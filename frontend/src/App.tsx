@@ -77,7 +77,9 @@ function AppContent() {
         </Routes>
       </main>
 
-      <footer className="site-footer">{t("footerLocal")}</footer>
+      <footer className="site-footer">
+        <a href="https://github.com/PaoloRos">{t("footerCredit")}</a>
+      </footer>
     </div>
   );
 }

@@ -21,6 +21,9 @@ describe("translated tool dashboard", () => {
   it("shows one German calendar-converter card with formats and route", () => {
     const { container } = renderDashboard();
 
+    expect(
+      screen.getByText("Praktische Werkzeuge für alltägliche Aufgaben."),
+    ).toBeVisible();
     expect(container.querySelector(".tools-grid")).not.toBeNull();
     const cards = screen.getAllByRole("article");
     expect(cards).toHaveLength(1);
@@ -55,6 +58,9 @@ describe("translated tool dashboard", () => {
     window.localStorage.setItem(LANGUAGE_STORAGE_KEY, "it");
     renderDashboard();
 
+    expect(
+      screen.getByText("Strumenti pratici per le attività ordinarie."),
+    ).toBeVisible();
     const card = screen.getByRole("article");
     expect(
       within(card).getByRole("heading", {

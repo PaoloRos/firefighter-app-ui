@@ -43,6 +43,27 @@ describe("App routing", () => {
     expect(screen.getByRole("main")).toHaveAttribute("tabindex", "-1");
   });
 
+  it("links the English developer credit to Paolo Rossi's GitHub profile", () => {
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    const developerCredit = screen.getByRole("link", {
+      name: "Developed by Paolo Rossi.",
+    });
+    expect(developerCredit).toHaveAttribute(
+      "href",
+      "https://github.com/PaoloRos",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Italiano" }));
+    expect(
+      screen.getByRole("link", { name: "Developed by Paolo Rossi." }),
+    ).toHaveAttribute("href", "https://github.com/PaoloRos");
+  });
+
   it("navigates from the dashboard into the converter workflow", () => {
     render(
       <MemoryRouter initialEntries={["/"]}>

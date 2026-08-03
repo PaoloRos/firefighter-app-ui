@@ -910,3 +910,23 @@ Use component tests for deterministic state and accessibility behavior, followed
 3. Resize the browser to approximately 320 px and desktop width; confirm that cards and map nodes reflow without horizontal page scrolling and that internal navigation remains usable.
 4. Confirm that the functionality section opens the `calendar-conversion` GitHub repository and that the README ends with @PaoloRos attribution plus the OpenAI Codex/GPT-5.6 disclosure.
 5. Stop the documentation server with `Ctrl+C`.
+
+### TASK-034 - Update main page wording
+
+**Ask:** Shorten the main-page introductory sentence in both languages and replace the footer’s local-device message with the English text “Developed by Paolo Rossi,” linking Paolo Rossi to https://github.com/PaoloRos.
+
+**Answer:** Shortened the dashboard introduction to “Praktische Werkzeuge für alltägliche Aufgaben.” in German and “Strumenti pratici per le attività ordinarie.” in Italian. Replaced the translated local-device footer with the English link “Developed by Paolo Rossi.” pointing to `https://github.com/PaoloRos`. Added focused coverage for both descriptions and the footer link in both language states. Verified all 56 frontend tests, the TypeScript/Vite production build, and the rendered local application in German and Italian with no console errors or horizontal page overflow.
+
+**Automated test:**
+
+1. From the repository root, run `make test-frontend`; confirm that seven test files and 56 tests pass.
+2. Run `make build`; confirm that TypeScript compilation and the Vite production build complete successfully.
+3. Run `git diff --check`; confirm that it produces no output and exits successfully.
+
+**Developer demo:**
+
+1. From the repository root, run `make run` if the local application is not already running, then open `http://127.0.0.1:8000/`.
+2. In German, confirm that the dashboard introduction reads “Praktische Werkzeuge für alltägliche Aufgaben.” and the footer reads “Developed by Paolo Rossi.”
+3. Select `Italiano` and confirm that the introduction reads “Strumenti pratici per le attività ordinarie.” while the footer remains in English.
+4. Follow the footer link and confirm that it opens `https://github.com/PaoloRos`.
+5. If you started the application in step 1, stop it with `Ctrl+C`.

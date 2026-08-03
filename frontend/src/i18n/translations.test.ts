@@ -19,6 +19,11 @@ describe("translation dictionaries", () => {
     expect(italianTranslations.brand).toBe("Feuerwehr Tools");
   });
 
+  it("keeps the developer credit in English in both languages", () => {
+    expect(germanTranslations.footerCredit).toBe("Developed by Paolo Rossi.");
+    expect(italianTranslations.footerCredit).toBe("Developed by Paolo Rossi.");
+  });
+
   it("translates every stable API error code", () => {
     expect(translateApiErrorCode("de", "oversized_upload")).toContain("10 MiB");
     expect(translateApiErrorCode("it", "oversized_upload")).toContain("10 MiB");

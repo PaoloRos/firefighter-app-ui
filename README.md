@@ -1,11 +1,11 @@
 # Feuerwehr Tools
 
-Feuerwehr Tools is a local React and FastAPI application for firefighter utilities. The current scaffold provides a German dashboard, a calendar-converter placeholder, a versioned health API, and a same-origin development proxy. The application binds only to `127.0.0.1`.
+Feuerwehr Tools is a local German/Italian React and FastAPI application for firefighter utilities. Its calendar converter accepts CSV or XLSX schedules, reports skipped events, and downloads an ICS calendar containing only valid events. The application binds only to `127.0.0.1` (`localhost`), so other devices cannot reach it.
 
 ## Prerequisites
 
 - Python 3.11 or newer
-- Node.js with pnpm 11
+- Node.js 20 or newer with pnpm 11
 - GNU Make
 
 ## Initial setup
@@ -16,7 +16,7 @@ From the repository root, install both backend and frontend dependencies:
 make setup
 ```
 
-The command creates `backend/.venv`, installs the backend with its test dependencies, and installs the exact frontend dependency versions from `frontend/pnpm-lock.yaml`. It is safe to run again after dependency changes.
+The command creates `backend/.venv`, installs the backend with its test dependencies, installs the exact frontend dependency versions from `frontend/pnpm-lock.yaml`, and installs Playwright's managed Chromium runtime. Initial setup requires internet access for missing dependencies and browser binaries. It is safe to run again after dependency changes.
 
 ## Development
 
@@ -34,20 +34,55 @@ The proxy target defaults to `http://127.0.0.1:8000`. For a different loopback H
 
 ## Tests
 
-Run all test suites currently present in the repository:
+Run the complete backend, frontend, production-integration, browser end-to-end, and invariant verification sequence:
 
 ```shell
 make test
 ```
 
-This runs the FastAPI pytest suite and the React/Vitest suite. Integration and end-to-end suites will be added to the same command when those tests exist.
+The command builds the production frontend where required, starts and stops the end-to-end server automatically, verifies `calendar-conversion v0.2.0`, checks Python dependencies, confirms the loopback binding, and rejects retained `.ics` files.
+
+Individual suites are also available:
+
+```shell
+make test-backend
+make test-frontend
+make test-integration
+make test-e2e
+make verify
+```
+
+Playwright downloads are written to its ignored temporary test-output directory. The application does not write uploaded schedules or generated calendars to the repository.
 
 ## Local production run
 
-`make run` is forthcoming. Production frontend building and serving through FastAPI belong to step 6 of [PLAN.md](PLAN.md); until then, use `make dev`.
+Build the Vite frontend and serve the complete application from FastAPI:
+
+```shell
+make run
+```
+
+Open [http://127.0.0.1:8000](http://127.0.0.1:8000). The UI, static assets, example schedule, and `/api/v1/` routes share this origin; Vite and the development proxy are not used. Press `Ctrl+C` to stop the server cleanly.
+
+After `make setup` has installed dependencies and the Playwright browser, `make run`, production conversion, and downloaded-calendar creation require no internet connection.
+
+## Calendar-converter workflow
+
+1. Open the calendar converter from the dashboard.
+2. Select or drop a CSV/XLSX schedule up to 10 MiB, or download the example XLSX schedule.
+3. Start conversion and review converted and skipped-event counts.
+4. For a complete or partial result, download the generated ICS calendar. Partial calendars contain only valid events. All-invalid schedules show their problems without offering an empty download.
+5. Switch between German and Italian at any time; an explicit choice is retained locally.
+
+Uploads and generated calendars are processed in memory and are not retained by the application.
 
 ## Troubleshooting
 
 - If setup reports that `pnpm` is missing, install pnpm 11 and rerun `make setup`.
-- If `make dev` reports a missing backend interpreter or Vite binary, run `make setup` first.
-- If port `5173` or `8000` is already in use, stop the existing local process before restarting development.
+- If Playwright reports that Chromium is missing, run `frontend/node_modules/.bin/playwright install chromium` while online.
+- If `make dev`, `make run`, or `make test` reports a missing backend interpreter or frontend binary, run `make setup` first.
+- If the production frontend build is missing, run `make build` or start through `make run`, which builds automatically.
+- If port `5173` or `8000` is already in use, stop the existing local process before restarting. Development uses both ports; production uses only `8000`.
+- If the development proxy fails, confirm that FastAPI is running on `127.0.0.1:8000` and that `FIREFIGHTER_TOOLS_API_TARGET` contains only a loopback HTTP URL.
+- If an end-to-end test fails, inspect `frontend/test-results/` or run `cd frontend && ./node_modules/.bin/playwright show-report`; these ignored diagnostic artifacts can be removed after review.
+- If setup fails while offline, reconnect for the initial dependency/browser installation. Normal `make run` operation is offline after setup completes.

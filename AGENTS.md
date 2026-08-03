@@ -42,8 +42,8 @@ The shared command contract is introduced as the application is scaffolded:
 
 - `make setup` installs Python and Node dependencies.
 - `make dev` runs Vite and FastAPI for development.
-- `make test` runs the currently available backend and frontend test suites; integration tests join it when they are added.
-- `make run` will build and serve the app on `127.0.0.1` in PLAN step 6; it is not available yet.
+- `make test` runs the backend, frontend, production-integration, Playwright end-to-end, and invariant verification suites.
+- `make run` builds the frontend and serves the complete application through FastAPI on `127.0.0.1`.
 
 ## Coding Style & Testing Guidelines
 

@@ -770,3 +770,122 @@ Use component tests for deterministic state and accessibility behavior, followed
 6. Switch between German and Italian after a result and confirm that all visible help, result, issue, and action text changes without losing the result.
 7. Check 320 px phone width, desktop width, and 200% browser zoom. Confirm there is no horizontal scrolling, clipping, or overlap and that controls remain at least 44 px.
 8. Enable reduced-motion preference and confirm that hover/focus layout remains stable without visible movement. Stop both development servers with `Ctrl+C`.
+
+## Step 6 of the implementation workflow
+
+### TASK-027 - Serve the production frontend through FastAPI
+
+**Ask**: Build the Vite frontend into production assets and serve them through FastAPI on the same origin. Preserve `/api/v1/` routes, support React Router SPA fallbacks, serve static assets with their correct content types, and keep production serving separate from the Vite development proxy. Add tests for the root page, nested frontend routes, static assets, API precedence, and missing-build behavior.
+
+**Answer:** Added opt-in production frontend serving to the FastAPI application factory. It serves built Vite files with their detected content types, falls back to `index.html` for React routes, leaves API and documentation routes ahead of the SPA fallback, rejects unknown `/api/` paths as JSON 404s, and reports a clear error when the build is missing. Development remains API-only behind the existing Vite proxy. Verified five focused production-serving tests and the real built root, nested route, asset, and API responses.
+
+**Automated test:**
+
+1. From the repository root, run `make build` and confirm that strict TypeScript checking and the Vite production build complete successfully.
+2. Run `backend/.venv/bin/python -m pytest backend/tests/test_production_frontend.py -vv` and confirm that all five production-serving tests pass.
+3. Run `git diff --check` and confirm that it produces no output and exits successfully.
+
+**Developer demo:**
+
+1. From the repository root, run `make run`.
+2. Open `http://127.0.0.1:8000/` and confirm that the production dashboard loads without a Vite server.
+3. Open `http://127.0.0.1:8000/tools/calendar-converter` directly and confirm that the React route loads rather than returning a server 404.
+4. Open `http://127.0.0.1:8000/api/v1/health` and confirm that it displays `{"status":"ok"}`, proving API precedence over the SPA fallback.
+5. Stop the server with `Ctrl+C`.
+
+### TASK-028 - Add the localhost production launch workflow
+
+**Ask**: Implement `make run` so it builds the frontend and starts the complete production-like application on `127.0.0.1`. Report the local URL, avoid binding to external interfaces, shut down cleanly on interruption, work without network access after setup, and provide actionable errors when prerequisites are missing.
+
+**Answer:** Added `make build` and `make run`. The production workflow validates local frontend and backend prerequisites, builds with the already-installed TypeScript and Vite binaries without network access, reports `http://127.0.0.1:8000`, and starts FastAPI with the explicit frontend build path. Verified the actual IPv4 listener was only `127.0.0.1:8000`, UI and API responses shared that origin, and `Ctrl+C` completed Uvicorn shutdown with no remaining port listener.
+
+**Automated test:**
+
+1. From the repository root, run `make build` and confirm that `frontend/dist/index.html` and hashed CSS/JavaScript assets are produced.
+2. Run `make verify` and confirm that it reports the production frontend, server host `127.0.0.1`, `calendar-conversion v0.2.0`, and no retained calendar files.
+3. Run `git diff --check` and confirm that it produces no output and exits successfully.
+
+**Developer demo:**
+
+1. From the repository root, run `make run` and confirm that it reports `Starting Feuerwehr Tools at http://127.0.0.1:8000`.
+2. Open that URL and exercise the dashboard and converter; confirm the browser remains on port `8000` for UI, assets, example download, and API calls.
+3. In another terminal, run `lsof -nP -iTCP:8000 -sTCP:LISTEN` and confirm the listener is `127.0.0.1:8000`, not `0.0.0.0` or an external address.
+4. Press `Ctrl+C`, rerun the `lsof` command, and confirm that no listener remains.
+
+### TASK-029 - Add Playwright end-to-end coverage
+
+**Ask**: Add Playwright end-to-end infrastructure and tests against the production-like application. Cover the dashboard-to-converter workflow for valid, partial, malformed, and all-invalid schedules, German and Italian switching, example-schedule access, calendar downloading, responsive phone and desktop layouts, and confirmation that the application retains no uploaded or generated files.
+
+**Answer:** Added lockfile-pinned Playwright with managed Chromium, a production-server configuration, deterministic CSV fixtures, and six browser tests. They cover dashboard navigation, a valid example XLSX, an Italian choice retained across reload, valid-only partial CSV download, all-invalid download suppression, safe malformed-input handling, stable example access, 320/1280 px overflow checks, temporary browser downloads, and absence of application upload/generated directories or repository ICS files.
+
+**Automated test:**
+
+1. After `make setup`, run `make test-e2e` from the repository root.
+2. Confirm that the production frontend builds and all six Playwright tests pass against the automatically managed `127.0.0.1:8000` server.
+3. Confirm that Playwright stops the server after the suite and that `frontend/test-results/` and `frontend/playwright-report/` remain ignored diagnostics.
+
+**Developer demo:**
+
+1. From the repository root, run `make run` and open `http://127.0.0.1:8000/`.
+2. Switch to Italian, open the converter, upload `assets/examples/calendar_schedule_example.xlsx`, convert it, download the ICS, and reload; confirm Italian remains selected and the calendar contains the three example events.
+3. Repeat with `frontend/e2e/fixtures/partial.csv`; confirm the partial result lists `invalid-1` and its downloaded calendar contains `UID:valid-1` but not `UID:invalid-1`.
+4. Convert `all-invalid.csv` and `malformed.csv`; confirm the former has no download and the latter shows a safe translated error.
+5. Check the converter at approximately 320 px and 1280 px widths and confirm there is no horizontal scrolling, then stop the server.
+
+### TASK-030 - Consolidate the automated verification workflow
+
+**Ask**: Extend the shared test commands to run backend, frontend, integration, and end-to-end verification in a documented and repeatable order. Verify the pinned `calendar-conversion v0.2.0` dependency, production frontend build, localhost-only binding, dependency consistency, and absence of retained uploads or generated calendars.
+
+**Answer:** Added `test-backend`, `test-frontend`, `test-integration`, `test-e2e`, and `verify` targets and made `make test` run them sequentially. Scoped Vitest away from Playwright specifications and added a release-invariant verifier for the installed `v0.2.0` revision, built frontend, `127.0.0.1` host, runtime-directory absence, and retained ICS absence. Verified the aggregate workflow with 76 backend tests, 54 frontend tests, 10 focused production/sample checks, six Playwright tests, repeated production builds, and a clean dependency check.
+
+**Automated test:**
+
+1. From the repository root, run `make test`.
+2. Confirm that 76 backend tests, 54 frontend tests, 10 focused integration checks, and six Playwright tests pass in order.
+3. Confirm that the final verifier reports `calendar-conversion: 0.2.0`, revision `v0.2.0`, `frontend/dist/index.html`, host `127.0.0.1`, and no retained calendar files.
+
+**Developer demo:**
+
+1. Run each focused command—`make test-backend`, `make test-frontend`, `make test-integration`, `make test-e2e`, and `make verify`—from the repository root.
+2. Confirm that each command identifies its subsystem clearly and can be rerun independently.
+3. Run `make test` and confirm that it reproduces the same complete sequence and leaves no server listening on port `8000`.
+
+### TASK-031 - Complete setup, run, and troubleshooting documentation
+
+**Ask**: Update the project documentation for the completed application. Document prerequisites, first-time setup, development mode, production-like `make run`, all test commands, local URLs, browser workflow, example schedule, offline operation after dependency installation, and common setup, proxy, build, port, and Playwright failures.
+
+**Answer:** Rewrote the README around the completed bilingual converter rather than the original placeholder. Documented Python/Node/pnpm/Make prerequisites, one-time dependency and Chromium setup, Vite/FastAPI development, single-origin production use, the complete conversion workflow, aggregate and focused test commands, offline operation after setup, local-only URLs, non-retention, and actionable setup, proxy, build, port, and Playwright troubleshooting. Synchronized the contributor command contract with the available `make run` and complete `make test` workflows.
+
+**Automated test:**
+
+1. From the repository root, run `make setup` and confirm the editable backend, frozen frontend lockfile, and Playwright Chromium setup complete successfully.
+2. Run `make test` and confirm the complete documented test workflow passes.
+3. Run `git diff --check` and confirm that it produces no output and exits successfully.
+
+**Developer demo:**
+
+1. Follow README `Initial setup`, `Development`, and `Local production run` sections from the repository root.
+2. Confirm `make dev` serves the Vite application at `http://127.0.0.1:5173` with the proxied health endpoint.
+3. Stop development, run `make run`, and confirm the built application and API share `http://127.0.0.1:8000` without Vite.
+4. Follow the documented converter workflow and one troubleshooting entry, then stop the server with `Ctrl+C`.
+
+### TASK-032 - Verify local production acceptance
+
+**Ask**: Perform the final technical acceptance pass for PLAN step 6. Start the built application using `make run`; verify loopback-only access, German and Italian dashboard-to-download workflows, valid, partial, malformed, and all-invalid schedules, phone and desktop layouts, calendar import, clean shutdown, offline startup after setup, and absence of retained uploads or generated calendars. Record the exact automated commands and manual demo.
+
+**Answer:** Completed the final production acceptance pass. The built application served the UI, nested React route, static assets, health endpoint, example download, and conversion API from `127.0.0.1:8000`; no external-interface listener was present. Automated browser coverage verified German and persistent Italian workflows, valid, partial, malformed, and all-invalid schedules, ICS downloads, and 320 px/1280 px layouts. The generated three-event example calendar was imported successfully into a temporary macOS Calendar calendar, where all three events were verified; the temporary calendar and its events were then permanently deleted with user confirmation. The production build also succeeded without network access after setup, `Ctrl+C` left no listener, and no uploaded or generated calendar files remained in the repository.
+
+**Automated test:**
+
+1. From the repository root, run `make test` and confirm that 76 backend tests, 54 frontend tests, 10 focused integration checks, and six Playwright tests pass.
+2. Run `make verify` and confirm `calendar-conversion` version `0.2.0` at revision `v0.2.0`, the production frontend build, host `127.0.0.1`, dependency consistency, and no retained calendar files.
+3. Run `git diff --check` and confirm that it produces no output and exits successfully.
+
+**Developer demo:**
+
+1. From the repository root, run `make run` and open `http://127.0.0.1:8000/`; confirm the dashboard, direct converter route, example download, and API all use the same origin.
+2. Switch between German and Italian and exercise the valid example XLSX plus `frontend/e2e/fixtures/partial.csv`, `all-invalid.csv`, and `malformed.csv`; confirm successful, partial, no-calendar, and safe-error behavior respectively.
+3. Download the valid ICS and import it into a temporary calendar application calendar; confirm the three valid events and remove the temporary calendar after inspection.
+4. Inspect the UI at approximately 320 px and 1280 px and confirm that controls remain usable with no horizontal page overflow.
+5. In another terminal, run `lsof -nP -iTCP:8000 -sTCP:LISTEN` and confirm only `127.0.0.1:8000` is listening. Press `Ctrl+C`, rerun the command, and confirm no listener remains.
+6. Confirm that the repository contains no retained `*.ics` files and no `uploads/` or `generated/` runtime directories.

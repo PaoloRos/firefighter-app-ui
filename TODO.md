@@ -889,3 +889,24 @@ Use component tests for deterministic state and accessibility behavior, followed
 4. Inspect the UI at approximately 320 px and 1280 px and confirm that controls remain usable with no horizontal page overflow.
 5. In another terminal, run `lsof -nP -iTCP:8000 -sTCP:LISTEN` and confirm only `127.0.0.1:8000` is listening. Press `Ctrl+C`, rerun the command, and confirm no listener remains.
 6. Confirm that the repository contains no retained `*.ics` files and no `uploads/` or `generated/` runtime directories.
+
+### TASK-033 - Add developer UI architecture documentation
+
+**Ask:** add the appropriate documentation about the architecture of the application. The documentation must be accessible by github pages, ie a index.html must be contained in the ./docs folder. This documentation regards the ui, and not the specific functionalities. About them, just give a concise introduction inserting the link to the reference repository of the specific framework. Be in general concise and whenever is a good idea, use a graphic documentation (ie. use functional maps and so on). This documentation is destinated for developers. Update the readme too, which has to give a brief introduction destinated for developers. INsert in the readme at the end that Ive use the AI tools Codex (gpt 5.6 as model) with the link to openai; moreover add that @PaoloRos is the author (me).
+
+**Answer:** Added a self-contained GitHub Pages entry point at `docs/index.html` with concise developer documentation for the UI shell, routing, page state, API boundary, i18n, design system, runtime modes, test layers, and extension path. Added responsive functional and state maps, a short calendar-tool introduction linked to its reference framework, and source links to the implementation. Updated the README with a developer-oriented introduction, architecture and framework links, author attribution, and the requested OpenAI Codex/GPT-5.6 disclosure. Verified direct static serving, valid internal navigation and unique IDs, script-free rendering without console errors, desktop and 320 px layouts without horizontal overflow, and all 54 frontend tests.
+
+**Automated test:**
+
+1. From the repository root, run `test -f docs/index.html && rg -q '<h1>UI architecture</h1>' docs/index.html && rg -q 'https://github.com/PaoloRos/calendar-conversion' docs/index.html && rg -q 'OpenAI Codex.*GPT-5.6' README.md`; confirm that it produces no output and exits successfully.
+2. Run `python3 -m http.server 4173 --bind 127.0.0.1 --directory docs`, then run `curl -fsS http://127.0.0.1:4173/ | cmp - docs/index.html` in another terminal; confirm that the comparison produces no output and exits successfully.
+3. Run `make test-frontend` and confirm that seven test files and 54 tests pass.
+4. Run `git diff --check` and confirm that it produces no output and exits successfully.
+
+**Developer demo:**
+
+1. From the repository root, run `python3 -m http.server 4173 --bind 127.0.0.1 --directory docs` and open `http://127.0.0.1:4173/`.
+2. Follow the page contents links and confirm that the UI request map, module map, converter state map, development/production topology, extension checklist, functionality boundary, and source index are present and readable.
+3. Resize the browser to approximately 320 px and desktop width; confirm that cards and map nodes reflow without horizontal page scrolling and that internal navigation remains usable.
+4. Confirm that the functionality section opens the `calendar-conversion` GitHub repository and that the README ends with @PaoloRos attribution plus the OpenAI Codex/GPT-5.6 disclosure.
+5. Stop the documentation server with `Ctrl+C`.

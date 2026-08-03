@@ -1,0 +1,845 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta
+      name="description"
+      content="Developer documentation for the Feuerwehr Tools UI architecture."
+    >
+    <title>Feuerwehr Tools — UI architecture</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+        --canvas: #f5f1e9;
+        --surface: #fffdf9;
+        --surface-muted: #f0e9de;
+        --text: #272320;
+        --muted: #665e56;
+        --line: #d8cec0;
+        --brand: #8f2323;
+        --brand-soft: #f7e6e2;
+        --code: #f3eee6;
+        --green: #28613b;
+        --green-soft: #e8f3eb;
+        --amber: #76520b;
+        --amber-soft: #fff2cc;
+        --shadow: 0 1rem 2.5rem rgb(71 51 34 / 8%);
+        --radius: 0.85rem;
+        --content: 74rem;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at 90% 0, rgb(143 35 35 / 7%), transparent 24rem),
+          var(--canvas);
+        color: var(--text);
+        line-height: 1.65;
+      }
+
+      a {
+        color: var(--brand);
+        text-underline-offset: 0.18em;
+      }
+
+      a:hover {
+        text-decoration-thickness: 0.13rem;
+      }
+
+      a:focus-visible {
+        outline: 0.2rem solid #8a5200;
+        outline-offset: 0.2rem;
+        border-radius: 0.15rem;
+      }
+
+      code {
+        padding: 0.12rem 0.35rem;
+        border-radius: 0.3rem;
+        background: var(--code);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 0.88em;
+      }
+
+      .skip-link {
+        position: fixed;
+        z-index: 10;
+        top: 0.75rem;
+        left: 0.75rem;
+        padding: 0.65rem 1rem;
+        border-radius: 0.5rem;
+        background: var(--brand);
+        color: white;
+        font-weight: 800;
+        transform: translateY(-180%);
+      }
+
+      .skip-link:focus {
+        transform: translateY(0);
+      }
+
+      .masthead {
+        border-bottom: 1px solid var(--line);
+      }
+
+      .masthead-inner,
+      .layout,
+      .footer-inner {
+        width: min(calc(100% - 2rem), var(--content));
+        margin-inline: auto;
+      }
+
+      .masthead-inner {
+        padding: clamp(2.5rem, 8vw, 5.5rem) 0 2.75rem;
+      }
+
+      .kicker,
+      .section-label {
+        margin: 0 0 0.5rem;
+        color: var(--brand);
+        font-size: 0.76rem;
+        font-weight: 850;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+
+      h1 {
+        max-width: 14ch;
+        margin-bottom: 1rem;
+        font-size: clamp(2.5rem, 8vw, 5.5rem);
+        line-height: 0.98;
+        letter-spacing: -0.045em;
+      }
+
+      h2 {
+        margin-bottom: 0.75rem;
+        font-size: clamp(1.7rem, 4vw, 2.4rem);
+        line-height: 1.12;
+        letter-spacing: -0.025em;
+      }
+
+      h3 {
+        margin-bottom: 0.45rem;
+        font-size: 1.05rem;
+        line-height: 1.3;
+      }
+
+      p,
+      li,
+      dd {
+        color: var(--muted);
+      }
+
+      .lead {
+        max-width: 60ch;
+        margin-bottom: 0;
+        font-size: clamp(1.05rem, 2vw, 1.25rem);
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: 13rem minmax(0, 1fr);
+        gap: clamp(2rem, 6vw, 5rem);
+        padding-block: 2.5rem 5rem;
+      }
+
+      .contents {
+        position: sticky;
+        top: 1.25rem;
+        align-self: start;
+      }
+
+      .contents strong {
+        display: block;
+        margin-bottom: 0.6rem;
+      }
+
+      .contents ol {
+        display: grid;
+        margin: 0;
+        padding: 0;
+        gap: 0.35rem;
+        list-style: none;
+      }
+
+      .contents a {
+        display: block;
+        padding: 0.35rem 0;
+        color: var(--muted);
+        font-size: 0.92rem;
+        font-weight: 650;
+        text-decoration: none;
+      }
+
+      .contents a:hover {
+        color: var(--brand);
+      }
+
+      main {
+        min-width: 0;
+      }
+
+      section {
+        scroll-margin-top: 1rem;
+      }
+
+      section + section {
+        margin-top: clamp(3.5rem, 8vw, 6rem);
+      }
+
+      .intro-grid,
+      .module-grid,
+      .runtime-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1rem;
+      }
+
+      .card,
+      .diagram,
+      .callout,
+      .source-table-wrap {
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--surface);
+        box-shadow: var(--shadow);
+      }
+
+      .card {
+        padding: 1.2rem;
+      }
+
+      .card p {
+        margin-bottom: 0;
+        font-size: 0.94rem;
+      }
+
+      .diagram {
+        margin: 1.5rem 0 0;
+        padding: clamp(1rem, 3vw, 1.7rem);
+        overflow: hidden;
+      }
+
+      .diagram-title {
+        margin-bottom: 1rem;
+        color: var(--muted);
+        font-size: 0.8rem;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .flow-row {
+        display: flex;
+        align-items: stretch;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 0.65rem;
+      }
+
+      .flow-row + .flow-row {
+        margin-top: 0.85rem;
+      }
+
+      .node {
+        min-width: 8.5rem;
+        flex: 1 1 8.5rem;
+        padding: 0.8rem;
+        border: 1px solid var(--line);
+        border-radius: 0.65rem;
+        background: var(--surface-muted);
+        text-align: center;
+      }
+
+      .node strong,
+      .node span {
+        display: block;
+      }
+
+      .node span {
+        margin-top: 0.15rem;
+        color: var(--muted);
+        font-size: 0.78rem;
+        line-height: 1.35;
+      }
+
+      .node.brand {
+        border-color: #d19b94;
+        background: var(--brand-soft);
+      }
+
+      .node.success {
+        border-color: #9bc2a5;
+        background: var(--green-soft);
+      }
+
+      .node.warning {
+        border-color: #dbbd71;
+        background: var(--amber-soft);
+      }
+
+      .arrow {
+        align-self: center;
+        color: var(--brand);
+        font-weight: 900;
+      }
+
+      .branch-label {
+        width: 100%;
+        margin: 0.2rem 0 -0.2rem;
+        color: var(--muted);
+        font-size: 0.78rem;
+        font-weight: 750;
+        text-align: center;
+      }
+
+      figcaption {
+        margin-top: 1rem;
+        color: var(--muted);
+        font-size: 0.86rem;
+      }
+
+      .module-card {
+        position: relative;
+        padding-top: 2.3rem;
+      }
+
+      .module-card::before {
+        position: absolute;
+        top: 1rem;
+        left: 1.2rem;
+        color: var(--brand);
+        content: attr(data-layer);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.72rem;
+        font-weight: 800;
+      }
+
+      .module-card ul {
+        margin: 0.65rem 0 0;
+        padding-left: 1.2rem;
+        font-size: 0.9rem;
+      }
+
+      .runtime-card {
+        display: grid;
+        gap: 0.75rem;
+      }
+
+      .runtime-card .node {
+        min-width: 0;
+      }
+
+      .runtime-arrow {
+        color: var(--brand);
+        font-weight: 900;
+        text-align: center;
+      }
+
+      .callout {
+        padding: 1.25rem;
+        border-left: 0.35rem solid var(--brand);
+      }
+
+      .callout p:last-child {
+        margin-bottom: 0;
+      }
+
+      .checklist {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        margin: 1.25rem 0 0;
+        padding: 0;
+        gap: 0.75rem;
+        counter-reset: steps;
+        list-style: none;
+      }
+
+      .checklist li {
+        position: relative;
+        min-height: 4rem;
+        padding: 1rem 1rem 1rem 3.25rem;
+        border: 1px solid var(--line);
+        border-radius: 0.7rem;
+        background: var(--surface);
+        counter-increment: steps;
+      }
+
+      .checklist li::before {
+        position: absolute;
+        top: 0.85rem;
+        left: 0.9rem;
+        display: grid;
+        width: 1.65rem;
+        height: 1.65rem;
+        place-items: center;
+        border-radius: 50%;
+        background: var(--brand);
+        color: white;
+        content: counter(steps);
+        font-size: 0.78rem;
+        font-weight: 850;
+      }
+
+      .source-table-wrap {
+        margin-top: 1.25rem;
+        overflow-x: auto;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      th,
+      td {
+        padding: 0.8rem 1rem;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        color: var(--text);
+        background: var(--surface-muted);
+        font-size: 0.8rem;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }
+
+      td {
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      tr:last-child td {
+        border-bottom: 0;
+      }
+
+      footer {
+        border-top: 1px solid var(--line);
+      }
+
+      .footer-inner {
+        padding-block: 1.5rem;
+        color: var(--muted);
+        font-size: 0.86rem;
+      }
+
+      @media (max-width: 50rem) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+
+        .contents {
+          position: static;
+          padding-bottom: 1rem;
+          border-bottom: 1px solid var(--line);
+        }
+
+        .contents ol {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 37rem) {
+        .intro-grid,
+        .module-grid,
+        .runtime-grid,
+        .checklist,
+        .contents ol {
+          grid-template-columns: 1fr;
+        }
+
+        .arrow {
+          width: 100%;
+          transform: rotate(90deg);
+          text-align: center;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
+        }
+      }
+
+      @media print {
+        body {
+          background: white;
+        }
+
+        .contents,
+        .skip-link {
+          display: none;
+        }
+
+        .layout {
+          display: block;
+          width: 100%;
+          padding: 1rem;
+        }
+
+        .card,
+        .diagram,
+        .callout,
+        .source-table-wrap {
+          box-shadow: none;
+          break-inside: avoid;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#content">Skip to architecture</a>
+
+    <header class="masthead">
+      <div class="masthead-inner">
+        <p class="kicker">Developer documentation</p>
+        <h1>UI architecture</h1>
+        <p class="lead">
+          Feuerwehr Tools is a bilingual, local-first React interface for a
+          growing collection of firefighter utilities. This page describes how
+          the UI is composed, how data crosses its API boundary, and where a
+          developer should extend it.
+        </p>
+      </div>
+    </header>
+
+    <div class="layout">
+      <nav class="contents" aria-label="Page contents">
+        <strong>On this page</strong>
+        <ol>
+          <li><a href="#principles">Principles</a></li>
+          <li><a href="#map">Functional map</a></li>
+          <li><a href="#modules">UI modules</a></li>
+          <li><a href="#state">State and data</a></li>
+          <li><a href="#runtime">Runtime modes</a></li>
+          <li><a href="#extend">Add a tool</a></li>
+          <li><a href="#functionality">Functionality boundary</a></li>
+          <li><a href="#sources">Source index</a></li>
+        </ol>
+      </nav>
+
+      <main id="content">
+        <section id="principles" aria-labelledby="principles-title">
+          <p class="section-label">01 · Orientation</p>
+          <h2 id="principles-title">Architecture principles</h2>
+          <div class="intro-grid">
+            <article class="card">
+              <h3>Tool-oriented shell</h3>
+              <p>
+                The dashboard discovers utilities through cards; each tool owns
+                a route, page state, API client, translations, and tests.
+              </p>
+            </article>
+            <article class="card">
+              <h3>Same-origin boundary</h3>
+              <p>
+                UI code calls versioned relative <code>/api/v1/</code> paths.
+                Vite proxies them in development; FastAPI serves both sides in
+                the production-like run.
+              </p>
+            </article>
+            <article class="card">
+              <h3>Typed at the edge</h3>
+              <p>
+                TypeScript models define expected payloads, and the API client
+                validates unknown JSON before page components consume it.
+              </p>
+            </article>
+            <article class="card">
+              <h3>Bilingual and accessible</h3>
+              <p>
+                German is the default, Italian is persisted locally, and the
+                shell supplies semantic navigation, focus handling, status
+                announcements, and responsive controls.
+              </p>
+            </article>
+          </div>
+        </section>
+
+        <section id="map" aria-labelledby="map-title">
+          <p class="section-label">02 · Composition</p>
+          <h2 id="map-title">Functional map</h2>
+          <p>
+            The React shell owns navigation and shared context. Routes select a
+            page; pages coordinate user interaction and delegate network work to
+            a feature API client.
+          </p>
+
+          <figure class="diagram" aria-labelledby="ui-map-caption">
+            <div class="diagram-title">UI request path</div>
+            <div class="flow-row">
+              <div class="node">
+                <strong>Browser</strong>
+                <span>keyboard · pointer · file input</span>
+              </div>
+              <span class="arrow" aria-hidden="true">→</span>
+              <div class="node brand">
+                <strong>App shell</strong>
+                <span>header · navigation · language</span>
+              </div>
+              <span class="arrow" aria-hidden="true">→</span>
+              <div class="node">
+                <strong>React Router</strong>
+                <span>dashboard · tool · not found</span>
+              </div>
+            </div>
+            <div class="branch-label">Tool route</div>
+            <div class="flow-row">
+              <div class="node">
+                <strong>Page state</strong>
+                <span>interaction and presentation</span>
+              </div>
+              <span class="arrow" aria-hidden="true">→</span>
+              <div class="node">
+                <strong>Feature API client</strong>
+                <span>request · contract validation</span>
+              </div>
+              <span class="arrow" aria-hidden="true">→</span>
+              <div class="node success">
+                <strong>FastAPI boundary</strong>
+                <span>relative /api/v1 endpoint</span>
+              </div>
+            </div>
+            <div class="branch-label">Cross-cutting UI services</div>
+            <div class="flow-row">
+              <div class="node warning">
+                <strong>I18n provider</strong>
+                <span>DE / IT dictionaries and error mapping</span>
+              </div>
+              <div class="node warning">
+                <strong>CSS system</strong>
+                <span>tokens · layout · focus · breakpoints</span>
+              </div>
+              <div class="node warning">
+                <strong>Test layers</strong>
+                <span>component · contract · browser</span>
+              </div>
+            </div>
+            <figcaption id="ui-map-caption">
+              Components never import backend implementation details or the
+              conversion framework directly.
+            </figcaption>
+          </figure>
+        </section>
+
+        <section id="modules" aria-labelledby="modules-title">
+          <p class="section-label">03 · Code ownership</p>
+          <h2 id="modules-title">UI modules</h2>
+          <div class="module-grid">
+            <article class="card module-card" data-layer="src/App.tsx">
+              <h3>Application shell</h3>
+              <ul>
+                <li>Shared header, navigation, footer, and skip link</li>
+                <li>Route table and not-found view</li>
+                <li>Top-level i18n provider</li>
+              </ul>
+            </article>
+            <article class="card module-card" data-layer="src/pages/">
+              <h3>Route pages</h3>
+              <ul>
+                <li>Dashboard composition</li>
+                <li>Tool-specific workflow and rendering state</li>
+                <li>Focus and announcement behavior</li>
+              </ul>
+            </article>
+            <article class="card module-card" data-layer="src/components/">
+              <h3>Reusable presentation</h3>
+              <ul>
+                <li>Typed props and semantic markup</li>
+                <li>No API or global-state ownership</li>
+                <li>Reusable dashboard-card pattern</li>
+              </ul>
+            </article>
+            <article class="card module-card" data-layer="src/api/">
+              <h3>Backend boundary</h3>
+              <ul>
+                <li>Endpoint and payload types</li>
+                <li>Runtime contract guards</li>
+                <li>Transport errors translated into safe states</li>
+              </ul>
+            </article>
+            <article class="card module-card" data-layer="src/i18n/">
+              <h3>Language boundary</h3>
+              <ul>
+                <li>German and Italian dictionaries</li>
+                <li>Stable API/issue-code translation</li>
+                <li>Persisted language preference</li>
+              </ul>
+            </article>
+            <article class="card module-card" data-layer="src/styles.css">
+              <h3>Visual system</h3>
+              <ul>
+                <li>Project-owned color, type, spacing, and shape tokens</li>
+                <li>40 rem and 64 rem responsive transitions</li>
+                <li>Focus, reduced-motion, and 44 px target rules</li>
+              </ul>
+            </article>
+          </div>
+        </section>
+
+        <section id="state" aria-labelledby="state-title">
+          <p class="section-label">04 · Interaction model</p>
+          <h2 id="state-title">State and data flow</h2>
+          <p>
+            Tool workflow state is local to its page and represented as a
+            discriminated union. This keeps impossible combinations out of the
+            render path and makes every visible outcome explicit.
+          </p>
+
+          <figure class="diagram" aria-labelledby="state-map-caption">
+            <div class="diagram-title">Current converter page state machine</div>
+            <div class="flow-row">
+              <div class="node"><strong>idle</strong><span>no file</span></div>
+              <span class="arrow" aria-hidden="true">→</span>
+              <div class="node"><strong>selected</strong><span>file retained in browser memory</span></div>
+              <span class="arrow" aria-hidden="true">→</span>
+              <div class="node warning"><strong>converting</strong><span>submission locked</span></div>
+              <span class="arrow" aria-hidden="true">→</span>
+              <div class="node success"><strong>result</strong><span>success · partial · failure</span></div>
+            </div>
+            <div class="branch-label">Validation, transport, or server error</div>
+            <div class="flow-row">
+              <div class="node brand"><strong>fatal</strong><span>stable error code → localized message</span></div>
+              <span class="arrow" aria-hidden="true">→</span>
+              <div class="node"><strong>reset</strong><span>return to idle</span></div>
+            </div>
+            <figcaption id="state-map-caption">
+              Result and fatal transitions move focus to the outcome heading;
+              progress and results expose status semantics to assistive
+              technology.
+            </figcaption>
+          </figure>
+        </section>
+
+        <section id="runtime" aria-labelledby="runtime-title">
+          <p class="section-label">05 · Delivery</p>
+          <h2 id="runtime-title">Runtime modes</h2>
+          <div class="runtime-grid">
+            <article class="card runtime-card">
+              <h3>Development · <code>make dev</code></h3>
+              <div class="node">
+                <strong>Browser :5173</strong>
+                <span>Vite dev server and hot reload</span>
+              </div>
+              <div class="runtime-arrow" aria-hidden="true">↓ /api proxy</div>
+              <div class="node success">
+                <strong>FastAPI :8000</strong>
+                <span>loopback API server</span>
+              </div>
+            </article>
+            <article class="card runtime-card">
+              <h3>Production-like · <code>make run</code></h3>
+              <div class="node">
+                <strong>Browser :8000</strong>
+                <span>single local origin</span>
+              </div>
+              <div class="runtime-arrow" aria-hidden="true">↓ UI + /api</div>
+              <div class="node success">
+                <strong>FastAPI :8000</strong>
+                <span>serves Vite dist and versioned API</span>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section id="extend" aria-labelledby="extend-title">
+          <p class="section-label">06 · Extension path</p>
+          <h2 id="extend-title">Adding another UI tool</h2>
+          <ol class="checklist">
+            <li>Add its metadata to the dashboard card collection.</li>
+            <li>Create a page under <code>src/pages/</code> and register its route.</li>
+            <li>Keep request types and runtime validation in a feature API client.</li>
+            <li>Add every visible string and stable error code to both dictionaries.</li>
+            <li>Reuse design tokens and semantic patterns before adding new CSS.</li>
+            <li>Cover the route, states, translations, API contract, and browser flow.</li>
+          </ol>
+        </section>
+
+        <section id="functionality" aria-labelledby="functionality-title">
+          <p class="section-label">07 · Out-of-scope internals</p>
+          <h2 id="functionality-title">Functionality boundary</h2>
+          <div class="callout">
+            <h3>Calendar conversion</h3>
+            <p>
+              The first tool accepts CSV/XLSX schedules and returns structured
+              validation results plus in-memory ICS text. Parsing, event
+              validation, and calendar generation belong to the separately
+              versioned
+              <a href="https://github.com/PaoloRos/calendar-conversion"
+                >calendar-conversion framework</a
+              >; the UI depends only on the versioned web API contract.
+            </p>
+          </div>
+        </section>
+
+        <section id="sources" aria-labelledby="sources-title">
+          <p class="section-label">08 · Navigation</p>
+          <h2 id="sources-title">Source index</h2>
+          <div class="source-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">Concern</th>
+                  <th scope="col">Primary source</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Shell and routes</td>
+                  <td><a href="https://github.com/PaoloRos/firefighter-app-ui/blob/main/frontend/src/App.tsx">frontend/src/App.tsx</a></td>
+                </tr>
+                <tr>
+                  <td>Dashboard pattern</td>
+                  <td><a href="https://github.com/PaoloRos/firefighter-app-ui/tree/main/frontend/src/pages">frontend/src/pages/</a> and <a href="https://github.com/PaoloRos/firefighter-app-ui/tree/main/frontend/src/components">frontend/src/components/</a></td>
+                </tr>
+                <tr>
+                  <td>API boundary</td>
+                  <td><a href="https://github.com/PaoloRos/firefighter-app-ui/tree/main/frontend/src/api">frontend/src/api/</a></td>
+                </tr>
+                <tr>
+                  <td>Translations</td>
+                  <td><a href="https://github.com/PaoloRos/firefighter-app-ui/tree/main/frontend/src/i18n">frontend/src/i18n/</a></td>
+                </tr>
+                <tr>
+                  <td>Design system</td>
+                  <td><a href="https://github.com/PaoloRos/firefighter-app-ui/blob/main/frontend/src/styles.css">frontend/src/styles.css</a></td>
+                </tr>
+                <tr>
+                  <td>Architecture decisions</td>
+                  <td><a href="https://github.com/PaoloRos/firefighter-app-ui/blob/main/PLAN.md">PLAN.md</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <footer>
+      <div class="footer-inner">
+        Feuerwehr Tools · UI architecture reference for contributors
+      </div>
+    </footer>
+  </body>
+</html>

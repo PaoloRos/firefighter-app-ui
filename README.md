@@ -1,6 +1,10 @@
 # Feuerwehr Tools
 
-Feuerwehr Tools is a local German/Italian React and FastAPI application for firefighter utilities. Its calendar converter accepts CSV or XLSX schedules, reports skipped events, and downloads an ICS calendar containing only valid events. The application binds only to `127.0.0.1` (`localhost`), so other devices cannot reach it.
+Feuerwehr Tools is a local, bilingual web application for firefighter utilities. The developer stack is React, TypeScript, and Vite for the UI, with a versioned FastAPI boundary for tool services. The application binds only to `127.0.0.1` (`localhost`), so other devices cannot reach it.
+
+The UI is organized as a shared application shell, a dashboard of tool cards, route-owned pages, translation dictionaries, feature API clients, and a project-owned responsive design system. See the [developer UI architecture documentation](docs/index.html) for functional maps, module responsibilities, runtime topology, and the extension path for new tools.
+
+The first tool converts CSV/XLSX schedules into ICS calendars and reports invalid events. Its parsing and calendar-generation internals are provided by the separately versioned [calendar-conversion framework](https://github.com/PaoloRos/calendar-conversion).
 
 ## Prerequisites
 
@@ -86,3 +90,9 @@ Uploads and generated calendars are processed in memory and are not retained by 
 - If the development proxy fails, confirm that FastAPI is running on `127.0.0.1:8000` and that `FIREFIGHTER_TOOLS_API_TARGET` contains only a loopback HTTP URL.
 - If an end-to-end test fails, inspect `frontend/test-results/` or run `cd frontend && ./node_modules/.bin/playwright show-report`; these ignored diagnostic artifacts can be removed after review.
 - If setup fails while offline, reconnect for the initial dependency/browser installation. Normal `make run` operation is offline after setup completes.
+
+## Credits
+
+Author: [Paolo Rossi](https://github.com/PaoloRos).
+
+This project was developed with assistance from [OpenAI Codex](https://openai.com/codex/), using GPT-5.6 as the model.

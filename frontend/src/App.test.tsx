@@ -43,7 +43,7 @@ describe("App routing", () => {
     expect(screen.getByRole("main")).toHaveAttribute("tabindex", "-1");
   });
 
-  it("links the English developer credit to Paolo Rossi's GitHub profile", () => {
+  it("links the localized developer credit and GitHub icon to PaoloRos", () => {
     render(
       <MemoryRouter initialEntries={["/"]}>
         <App />
@@ -51,16 +51,19 @@ describe("App routing", () => {
     );
 
     const developerCredit = screen.getByRole("link", {
-      name: "Developed by Paolo Rossi.",
+      name: "Entwickelt von PaoloRos.",
     });
     expect(developerCredit).toHaveAttribute(
       "href",
       "https://github.com/PaoloRos",
     );
+    const githubIcon = developerCredit.querySelector("svg");
+    expect(githubIcon).toHaveClass("footer-credit-icon");
+    expect(githubIcon).toHaveAttribute("aria-hidden", "true");
 
     fireEvent.click(screen.getByRole("button", { name: "Italiano" }));
     expect(
-      screen.getByRole("link", { name: "Developed by Paolo Rossi." }),
+      screen.getByRole("link", { name: "Sviluppato da PaoloRos." }),
     ).toHaveAttribute("href", "https://github.com/PaoloRos");
   });
 

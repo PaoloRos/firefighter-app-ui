@@ -793,6 +793,21 @@ p {
   font-size: var(--font-size-sm);
 }
 
+.footer-credit {
+  min-height: var(--target-size);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 700;
+  text-underline-offset: 0.2rem;
+}
+
+.footer-credit-icon {
+  width: 1.125rem;
+  height: 1.125rem;
+  flex: 0 0 auto;
+}
+
 /* CSS custom properties cannot currently drive media-query conditions.
    Keep these values aligned with --breakpoint-narrow and --breakpoint-wide. */
 @media (max-width: 40rem) {

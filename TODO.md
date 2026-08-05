@@ -930,3 +930,23 @@ Use component tests for deterministic state and accessibility behavior, followed
 3. Select `Italiano` and confirm that the introduction reads “Strumenti pratici per le attività ordinarie.” while the footer remains in English.
 4. Follow the footer link and confirm that it opens `https://github.com/PaoloRos`.
 5. If you started the application in step 1, stop it with `Ctrl+C`.
+
+### TASK-035 - Add localized GitHub footer credit
+
+**Ask:** Replace the footer signature with a GitHub symbol and a localized developer credit linked to `https://github.com/PaoloRos`: “Entwickelt von PaoloRos.” in German and “Sviluppato da PaoloRos.” in Italian.
+
+**Answer:** Replaced the English footer signature with a localized developer credit: “Entwickelt von PaoloRos.” in German and “Sviluppato da PaoloRos.” in Italian. Added an inline GitHub mark beside the text and kept the complete credit linked to `https://github.com/PaoloRos`. The icon inherits the footer color, remains aligned with the text, and is hidden from assistive technology so the localized link text provides the accessible name. Added focused translation, component, icon, and shared-target styling coverage. Verified all 56 frontend tests, the TypeScript/Vite production build, live German and Italian rendering, the icon and link attributes, a narrow viewport without horizontal overflow, and a clean browser console.
+
+**Automated test:**
+
+1. From the repository root, run `make test-frontend`; confirm that seven test files and 56 tests pass.
+2. Run `make build`; confirm that TypeScript compilation and the Vite production build complete successfully.
+3. Run `git diff --check`; confirm that it produces no output and exits successfully.
+
+**Developer demo:**
+
+1. From the repository root, run `make run` and open `http://127.0.0.1:8000/`.
+2. In German, confirm that the footer shows the GitHub symbol followed by “Entwickelt von PaoloRos.” and that the complete credit links to `https://github.com/PaoloRos`.
+3. Select `Italiano` and confirm that the footer changes to “Sviluppato da PaoloRos.” while retaining the same GitHub symbol and profile link.
+4. Resize the browser to approximately 320 px and confirm that the icon and text remain aligned without horizontal page scrolling.
+5. Stop the application with `Ctrl+C`.

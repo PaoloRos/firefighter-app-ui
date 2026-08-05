@@ -42,6 +42,7 @@ describe("design system stylesheet", () => {
       ".language-switch button",
       ".button-link",
       ".text-link",
+      ".footer-credit",
     ]) {
       const rule = stylesheet.match(
         new RegExp(

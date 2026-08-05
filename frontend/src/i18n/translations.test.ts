@@ -19,9 +19,9 @@ describe("translation dictionaries", () => {
     expect(italianTranslations.brand).toBe("Feuerwehr Tools");
   });
 
-  it("keeps the developer credit in English in both languages", () => {
-    expect(germanTranslations.footerCredit).toBe("Developed by Paolo Rossi.");
-    expect(italianTranslations.footerCredit).toBe("Developed by Paolo Rossi.");
+  it("localizes the developer credit in both languages", () => {
+    expect(germanTranslations.footerCredit).toBe("Entwickelt von PaoloRos.");
+    expect(italianTranslations.footerCredit).toBe("Sviluppato da PaoloRos.");
   });
 
   it("translates every stable API error code", () => {

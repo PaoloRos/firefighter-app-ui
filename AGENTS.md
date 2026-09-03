@@ -4,9 +4,9 @@
 
 `PLAN.md` is the architectural source of truth; update it when boundaries, APIs, or delivery phases change. Use `frontend/` for React and TypeScript, `backend/` for FastAPI, an assets directory for samples, and subsystem test directories. Separate UI, translations, and API clients; keep backend routes, models, adapters, and services distinct.
 
-## Task History in TODO.md
+## Task Queue in TODO.md and History in IMPLEMENTATION.md
 
-The user launches project implementation tasks in `TODO.md` by writing the identifier, title, and `Ask`. Agents must not create tasks, rewrite asks, or infer work items. Keep identifiers sequential (`TASK-001`, `TASK-002`, and so on) without reuse or renumbering. Before implementation, confirm the entry exists. After verification, add its brief `Answer`.
+The user launches project implementation tasks in `TODO.md` by writing the identifier, title, and `Ask`. `TODO.md` is the queue of pending or in-progress tasks; `IMPLEMENTATION.md` is the permanent record of completed tasks. Agents must not create tasks, rewrite asks, or infer work items. Keep identifiers sequential (`TASK-001`, `TASK-002`, and so on) without reuse or renumbering; the highest identifier in `IMPLEMENTATION.md` is the running counter. Before implementation, confirm the entry exists in `TODO.md`. After verification, add its brief `Answer`, then move the completed entry out of `TODO.md` and append the full record to `IMPLEMENTATION.md`.
 
 Starting with `TASK-004`, every completed task must also include two sections immediately after the answer:
 
@@ -33,9 +33,9 @@ Use this format:
 2. Open the documented local URL and confirm the expected visible behavior.
 ```
 
-Keep answers and test/demo instructions factual and synchronized with delivered work. Do not record commands that were not verified. If an implementation task is missing, ask the user to add it. User instructions may explicitly exempt agent-behavior or documentation maintenance from this process.
+Keep answers and test/demo instructions factual and synchronized with delivered work. Do not record commands that were not verified. If an implementation task is missing, ask the user to add it to `TODO.md`. User instructions may explicitly exempt agent-behavior or documentation maintenance from this process.
 
-Finally, **when confirmed by the user**, insert a new task depending on the prompted instructions, by respecting the previous rules about the tasks, and then start to work on it, tracking progress with the TodoWrite tool. Use the `/todo-task` skill (`.claude/skills/todo-task/SKILL.md`) for this repetitive flow.
+Finally, **when confirmed by the user**, insert a new task into `TODO.md` depending on the prompted instructions, by respecting the previous rules about the tasks, and then start to work on it, tracking progress with the TodoWrite tool. On completion, record the finished task in `IMPLEMENTATION.md` and remove it from `TODO.md`. Use the `/todo-task` skill (`.claude/skills/todo-task/SKILL.md`) for this repetitive flow.
 ## Build, Test, and Development Commands
 
 The shared command contract is introduced as the application is scaffolded:

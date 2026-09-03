@@ -1,12 +1,14 @@
 # Project instructions
 
-See @AGENTS.md for repository structure, the `TODO.md` task-history process,
-build/test commands, coding style, and commit/security rules.
+See @AGENTS.md for repository structure, the task process (`TODO.md` queue,
+`IMPLEMENTATION.md` history), build/test commands, coding style, and
+commit/security rules.
 
 See @PLAN.md for the architectural source of truth.
 
 For the recurring "add a task to `TODO.md` and run it" flow, use the `/todo-task`
-skill (`.claude/skills/todo-task/SKILL.md`).
+skill (`.claude/skills/todo-task/SKILL.md`). Completed tasks are recorded in
+`IMPLEMENTATION.md` and removed from `TODO.md`.
 
 ## Commits
 

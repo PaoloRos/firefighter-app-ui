@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(make setup)",
+      "Bash(make dev)",
+      "Bash(make build)",
+      "Bash(make run)",
+      "Bash(make test)",
+      "Bash(make test-backend)",
+      "Bash(make test-frontend)",
+      "Bash(make test-integration)",
+      "Bash(make test-e2e)",
+      "Bash(make verify)",
+      "Bash(pnpm --dir frontend :*)",
+      "Bash(cd frontend && ./node_modules/.bin/vitest :*)",
+      "Bash(cd frontend && ./node_modules/.bin/tsc :*)",
+      "Bash(cd frontend && ./node_modules/.bin/playwright :*)",
+      "Bash(backend/.venv/bin/python -m pytest :*)",
+      "Bash(backend/.venv/bin/python -m pip check)",
+      "Bash(git diff --check)",
+      "Bash(git status)",
+      "Bash(git log :*)"
+    ],
+    "deny": [
+      "Bash(git push :*)",
+      "Bash(git remote :*)",
+      "Bash(git remote add :*)",
+      "Bash(git remote set-url :*)",
+      "Bash(git fetch :*)",
+      "Bash(git pull :*)",
+      "Bash(git tag :*)",
+      "Bash(gh :*)"
+    ]
+  }
+}

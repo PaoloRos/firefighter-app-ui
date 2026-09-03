@@ -6,6 +6,11 @@
 .idea/
 .vscode/
 
+# Claude Code: keep CLAUDE.md and .claude/settings.json tracked; ignore local-only state
+.claude/settings.local.json
+.claude/*.local.json
+CLAUDE.local.md
+
 .pnpm-store/
 /node_modules/
 

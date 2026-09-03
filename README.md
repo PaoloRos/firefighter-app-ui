@@ -95,4 +95,4 @@ Uploads and generated calendars are processed in memory and are not retained by 
 
 Author: [Paolo Rossi](https://github.com/PaoloRos).
 
-This project was developed with assistance from [OpenAI Codex](https://openai.com/codex/), using GPT-5.6 as the model.
+This project was developed with AI assistance: initially with [OpenAI Codex](https://openai.com/codex/) (GPT-5.6), and from September 2026 with [Claude Code](https://claude.com/claude-code) (Claude Sonnet 5).

@@ -35,7 +35,7 @@ Use this format:
 
 Keep answers and test/demo instructions factual and synchronized with delivered work. Do not record commands that were not verified. If an implementation task is missing, ask the user to add it. User instructions may explicitly exempt agent-behavior or documentation maintenance from this process.
 
-Finally, **when confirmed by the user**, insert a new task depending on the prompted instructions, by respecting the previous rules about the tasks, and then start to work on him. Follow the instructions in `SKILL.md` for this repetitive task.
+Finally, **when confirmed by the user**, insert a new task depending on the prompted instructions, by respecting the previous rules about the tasks, and then start to work on it, tracking progress with the TodoWrite tool. Use the `/todo-task` skill (`.claude/skills/todo-task/SKILL.md`) for this repetitive flow.
 ## Build, Test, and Development Commands
 
 The shared command contract is introduced as the application is scaffolded:

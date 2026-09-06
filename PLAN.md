@@ -56,6 +56,7 @@ flowchart LR
 
 - Build a React, TypeScript, and Vite frontend with React Router, i18n translation dictionaries, component tests, and project-owned CSS design tokens.
 - Build a Python FastAPI backend using Pydantic, Uvicorn, and multipart upload support.
+- Persist application accounts in a local SQLite database through SQLAlchemy, and authenticate them with a signed session cookie. Roles gate behavior: `super_user` accounts may upload schedules; `user` accounts may only use read-only tool features.
 - Use Vite’s API proxy during development. For the local packaged build, FastAPI serves the compiled frontend and API from one origin.
 - Organize the repository around `frontend/`, `backend/`, sample assets, shared developer commands, tests, and setup documentation.
 - Provide `make setup`, `make dev`, `make test`, and `make run` workflows. Initialize Git and add suitable Python, Node, editor, generated-file, and upload-artifact exclusions.
@@ -88,8 +89,19 @@ Implement `POST /api/v1/tools/calendar-converter/convert` with one multipart `fi
 - Return `413` for oversized uploads, `415` for unsupported types, `422` for malformed schedules, and a generic localized-safe `500` response for unexpected failures.
 - Use stable error codes for frontend translation; never expose tracebacks.
 - Do not persist or log uploaded content. Sanitize filenames and bind the production-like local server only to `127.0.0.1`.
+- Require a `super_user` session for `POST .../convert`; return `401` with a stable `not_authenticated` code when unauthenticated and `403` with `forbidden` when the session is a plain `user`.
 
 React will create a `text/calendar;charset=utf-8` Blob from the returned ICS text and initiate the download locally.
+
+### Users and access control
+
+Store accounts in a local SQLite database (`data/firefighter.db` by default, overridable with `FIREFIGHTER_TOOLS_DATABASE_URL`) through SQLAlchemy models kept separate from the Pydantic API contract. Each account has a `username`, a scrypt password hash (stdlib `hashlib.scrypt`, never logged), a `role` of `super_user` or `user`, and the firefighter profile fields `name`, `surname`, `rank`, `zug`, and `gruppe`.
+
+- Authenticate with Starlette's signed session cookie (`itsdangerous`), keyed from `FIREFIGHTER_TOOLS_SECRET_KEY` with a development-only fallback. The cookie carries only the account id.
+- `POST /api/v1/auth/login` verifies credentials and starts the session; `POST /api/v1/auth/logout` clears it; `GET /api/v1/auth/me` returns the signed-in account without secrets. Failures use stable codes (`invalid_credentials`, `not_authenticated`, `forbidden`) and never expose tracebacks.
+- `super_user` accounts may upload schedules through the converter; every signed-in account may download the example schedule and, later, its own generated calendar.
+- Create and manage accounts with the `python -m firefighter_tools_backend create-user` command; the database file and `.env` are git-ignored and never committed.
+- This does not change the deployment posture: the server still binds `127.0.0.1` only, and internet publication (TLS, rate limiting, session hardening) remains a separate later phase.
 
 ## User Experience
 
@@ -150,6 +162,7 @@ flowchart TD
 
 - Converter tests cover valid CSV/XLSX, partial conversion, all-invalid input, malformed rows, duplicate IDs, unsupported extensions, and unchanged CLI exit/report behavior.
 - API tests cover success, partial and failure payloads, 10 MiB enforcement, malformed uploads, filename sanitization, Unicode, and absence of retained files.
+- Authentication tests cover login success and failure, session `me`/logout, scrypt hashing that never stores plaintext, `401` for unauthenticated conversion, and `403` for a plain `user`; every signed-in account can still download the example schedule.
 - Frontend tests cover routing, both languages, upload validation, state transitions, issue rendering, partial download, reset behavior, and persisted language choice.
 - End-to-end tests cover dashboard-to-download flows for valid, partially valid, malformed, and all-invalid sample files.
 - Accessibility checks cover keyboard-only use, focus order, semantic labels, screen-reader announcements, contrast, zoom, and phone-sized layouts.
@@ -158,7 +171,7 @@ flowchart TD
 
 ## Assumptions and Later Roadmap
 
-- The MVP has no accounts, database, analytics, background jobs, or server-side file history.
+- The application has local accounts in a SQLite user store with `super_user` and `user` roles, but no analytics, background jobs, or server-side history of uploaded or generated files.
 - A human-authored schedule is small enough for synchronous conversion and JSON delivery.
 - Internet publication is a separate phase requiring explicit decisions about hosting, authentication, authorization, TLS, rate limiting, privacy, monitoring, retention, and deployment.
 - Additional programs will follow the dashboard-card pattern and receive their own versioned API routes and backend adapters.

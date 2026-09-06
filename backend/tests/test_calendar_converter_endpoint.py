@@ -1,6 +1,5 @@
 """HTTP contract tests for the calendar converter endpoint."""
 
-from collections.abc import Generator
 from pathlib import Path
 import tempfile
 from typing import BinaryIO
@@ -12,7 +11,6 @@ from httpx2 import Response
 from starlette import formparsers
 
 import firefighter_tools_backend.routes.calendar_converter as route
-from firefighter_tools_backend import create_app
 from firefighter_tools_backend.domain.calendar_conversion import (
     ConversionErrorCode,
     ConversionResult,
@@ -36,12 +34,6 @@ SAMPLE_XLSX_PATH = (
     / "examples"
     / "calendar_schedule_example.xlsx"
 )
-
-
-@pytest.fixture
-def client() -> Generator[TestClient]:
-    with TestClient(create_app()) as test_client:
-        yield test_client
 
 
 def post_csv(
@@ -81,6 +73,36 @@ def test_every_expected_domain_error_has_an_http_mapping() -> None:
     assert {
         status_code for status_code, _, _ in route._CONVERSION_ERRORS.values()
     } == {415, 422}
+
+
+def test_rejects_conversion_without_a_session(
+    anonymous_client: TestClient,
+) -> None:
+    response = post_csv(
+        anonymous_client,
+        "event-1,Exercise,true,2026-07-22,,2026-07-22,,,\n",
+    )
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "code": "not_authenticated",
+        "message": "Authentication is required.",
+    }
+
+
+def test_rejects_conversion_for_a_non_super_user(
+    user_client: TestClient,
+) -> None:
+    response = post_csv(
+        user_client,
+        "event-1,Exercise,true,2026-07-22,,2026-07-22,,,\n",
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {
+        "code": "forbidden",
+        "message": "This action requires a super-user.",
+    }
 
 
 def test_returns_success_with_calendar_for_valid_schedule(

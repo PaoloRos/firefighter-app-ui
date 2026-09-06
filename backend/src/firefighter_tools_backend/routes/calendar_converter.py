@@ -2,9 +2,13 @@
 
 from pathlib import Path, PurePath
 
-from fastapi import APIRouter, File, UploadFile, status
+from fastapi import APIRouter, Depends, File, UploadFile, status
 from fastapi.responses import FileResponse, JSONResponse
 
+from firefighter_tools_backend.dependencies import (
+    get_current_user,
+    require_super_user,
+)
 from firefighter_tools_backend.domain.calendar_conversion import (
     ConversionError,
     ConversionErrorCode,
@@ -14,6 +18,8 @@ from firefighter_tools_backend.domain.upload import (
     UploadValidationError,
     UploadValidationErrorCode,
 )
+from firefighter_tools_backend.domain.user import User
+from firefighter_tools_backend.models.auth import AuthErrorResponse
 from firefighter_tools_backend.models.calendar_conversion import (
     Calendar,
     ConversionResponse,
@@ -88,8 +94,11 @@ _CONVERSION_ERRORS = {
 @router.get(
     "/example",
     response_class=FileResponse,
+    responses={401: {"model": AuthErrorResponse}},
 )
-def download_example_schedule() -> FileResponse:
+def download_example_schedule(
+    _: User = Depends(get_current_user),
+) -> FileResponse:
     """Download the version-controlled example schedule without copying it."""
     return FileResponse(
         _SAMPLE_SCHEDULE_PATH,
@@ -102,6 +111,8 @@ def download_example_schedule() -> FileResponse:
     "/convert",
     response_model=ConversionResponse,
     responses={
+        401: {"model": AuthErrorResponse},
+        403: {"model": AuthErrorResponse},
         413: {"model": FatalErrorResponse},
         415: {"model": FatalErrorResponse},
         422: {"model": FatalErrorResponse},
@@ -110,6 +121,7 @@ def download_example_schedule() -> FileResponse:
 )
 async def convert_calendar_upload(
     file: UploadFile | None = File(default=None),
+    _: User = Depends(require_super_user),
 ) -> ConversionResponse | JSONResponse:
     """Validate one upload, convert it, and expose only declared responses."""
     if file is None:

@@ -2,15 +2,27 @@
 
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, JSONResponse
+from starlette.middleware.sessions import SessionMiddleware
 
+from firefighter_tools_backend.config import settings
+from firefighter_tools_backend.db import init_db
+from firefighter_tools_backend.domain.user import AuthError, AuthErrorCode
+from firefighter_tools_backend.models.auth import AuthErrorResponse
+from firefighter_tools_backend.routes.auth import router as auth_router
 from firefighter_tools_backend.routes.calendar_converter import (
     router as calendar_converter_router,
 )
 from firefighter_tools_backend.routes.health import router as health_router
 
 API_PREFIX = "/api/v1"
+
+_AUTH_ERROR_RESPONSES: dict[AuthErrorCode, tuple[int, str]] = {
+    AuthErrorCode.INVALID_CREDENTIALS: (401, "Invalid username or password."),
+    AuthErrorCode.NOT_AUTHENTICATED: (401, "Authentication is required."),
+    AuthErrorCode.FORBIDDEN: (403, "This action requires a super-user."),
+}
 
 
 class FrontendBuildNotFoundError(RuntimeError):
@@ -19,12 +31,35 @@ class FrontendBuildNotFoundError(RuntimeError):
 
 def create_app(*, frontend_dist: Path | None = None) -> FastAPI:
     """Create and configure an independent FastAPI application instance."""
+    init_db()
+
     application = FastAPI(title="Feuerwehr Tools API", version="0.1.0")
+    application.add_middleware(
+        SessionMiddleware,
+        secret_key=settings.secret_key,
+        session_cookie=settings.session_cookie_name,
+        max_age=settings.session_max_age,
+        same_site="lax",
+        https_only=False,
+    )
+    application.add_exception_handler(AuthError, _handle_auth_error)
     application.include_router(health_router, prefix=API_PREFIX)
+    application.include_router(auth_router, prefix=API_PREFIX)
     application.include_router(calendar_converter_router, prefix=API_PREFIX)
     if frontend_dist is not None:
         _configure_frontend_serving(application, frontend_dist)
     return application
+
+
+async def _handle_auth_error(_: Request, error: Exception) -> JSONResponse:
+    """Render a typed, traceback-free body for an auth failure."""
+    assert isinstance(error, AuthError)
+    status_code, message = _AUTH_ERROR_RESPONSES[error.code]
+    payload = AuthErrorResponse(code=error.code.value, message=message)
+    return JSONResponse(
+        status_code=status_code,
+        content=payload.model_dump(mode="json"),
+    )
 
 
 def _configure_frontend_serving(

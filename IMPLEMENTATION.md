@@ -953,3 +953,28 @@ Use component tests for deterministic state and accessibility behavior, followed
 3. Select `Italiano` and confirm that the footer changes to “Sviluppato da PaoloRos.” while retaining the same GitHub symbol and profile link.
 4. Resize the browser to approximately 320 px and confirm that the icon and text remain aligned without horizontal page scrolling.
 5. Stop the application with `Ctrl+C`.
+
+## Post-MVP feature work
+
+### TASK-036 - User database, authentication, and role-based upload access
+
+**Ask:** Add a SQLite user database with `super-user` and `user` roles, username/password authentication with a session cookie, and gate the calendar-converter upload endpoint to `super-user`. Update `PLAN.md` to reflect the new user/role architecture.
+
+**Answer:** Added a local SQLite user store through SQLAlchemy (`db/` package with `UserRecord`; default `data/firefighter.db`, overridable via `FIREFIGHTER_TOOLS_DATABASE_URL`) plus a framework-free `domain/user.py` (`User`, `Role`, `AuthError`). Authentication uses a `services/auth.py` layer with stdlib `hashlib.scrypt` password hashing (self-describing `scrypt$n$r$p$salt$hash` strings, constant-time verification) and a `user_repository` adapter. New `POST /api/v1/auth/login`, `POST /api/v1/auth/logout`, and `GET /api/v1/auth/me` routes run on a Starlette signed session cookie (secret from `FIREFIGHTER_TOOLS_SECRET_KEY`, development-only fallback with a runtime warning). `dependencies.py` adds `get_db`, `get_current_user` (`401 not_authenticated`), and `require_super_user` (`403 forbidden`), rendered by a typed, traceback-free `AuthError` handler. `POST .../calendar-converter/convert` now requires a `super_user` session and `GET .../example` requires any signed-in account; `/api/v1/health` and SPA serving stay public. Added a `python -m firefighter_tools_backend create-user` management subcommand (password via `getpass`, never echoed or logged). Updated `PLAN.md` (architecture, "Users and access control", assumptions, test plan), `AGENTS.md` (account-security rules), `.gitignore` (`data/`, `*.db`, `*.sqlite3`), and `scripts/verify.py` (ignore `data/`). Shared `backend/tests/conftest.py` fixtures provide an isolated database and authenticated clients. Verified 92 backend tests, `make test-backend`, `make test-integration`, `make test-frontend` (56, unchanged), `make verify`, `pip check`, a clean `git diff --check`, and a live loopback HTTP walkthrough of login, `me`, super-user conversion, `403` for a plain user, example download for a plain user, and `401` on an anonymous conversion.
+
+**Automated test:**
+
+1. From the repository root, run `make test-backend`; confirm that 92 tests pass, including `backend/tests/test_auth.py` and `backend/tests/test_user_cli.py`.
+2. Run `make test-integration`; confirm that the 10 production-frontend and sample-schedule tests pass.
+3. Run `make test-frontend`; confirm that seven test files and 56 tests pass (unchanged by this task).
+4. Run `make verify`; confirm that the build succeeds, `pip check` reports no broken requirements, and the invariant verifier prints `server host: 127.0.0.1` and `retained calendar files: none`.
+5. Run `git diff --check`; confirm that it produces no output.
+
+**Developer demo:**
+
+1. From the repository root, create the first account: `backend/.venv/bin/python -m firefighter_tools_backend create-user --username chief --role super_user --name Anna` and enter a password twice at the prompts. Repeat with `--username member --role user` for a normal account.
+2. Start the application with `make run` and note the printed `http://127.0.0.1:8000`.
+3. In a second terminal, confirm an anonymous upload is refused: `curl -s -o /dev/null -w '%{http_code}\n' -X POST 127.0.0.1:8000/api/v1/tools/calendar-converter/convert -F 'file=@assets/examples/calendar_schedule_example.xlsx'` prints `401`.
+4. Sign in as the super-user: `curl -s -c jar -X POST 127.0.0.1:8000/api/v1/auth/login -H 'content-type: application/json' -d '{"username":"chief","password":"<password>"}'` returns the profile JSON, and `curl -s -b jar 127.0.0.1:8000/api/v1/auth/me` returns the same account.
+5. With `-b jar`, confirm the same conversion `curl` now prints `200`; sign in as `member` into a second cookie jar and confirm the conversion prints `403` (`{"code":"forbidden"}`) while `GET /api/v1/tools/calendar-converter/example` prints `200`.
+6. Stop the application with `Ctrl+C`.

@@ -58,3 +58,5 @@ Use short imperative commit subjects, for example `Add calendar upload validatio
 Do not pull from or publish to GitHub automatically. Never create or update remotes, pull or push branches or tags, modify pull requests, or create releases. Leave work local for review. If publication is necessary, pause before any GitHub mutation, explain why, and let the user publish manually. Read-only inspection is allowed.
 
 Enforce the 10 MiB upload limit, sanitize filenames, bind locally to `127.0.0.1`, and retain no uploaded files. Never log schedule contents or commit secrets, generated calendars, or local environment files.
+
+Store account passwords only as `hashlib.scrypt` hashes and never log them. Read the session secret from `FIREFIGHTER_TOOLS_SECRET_KEY`; the built-in default is for local development only. The SQLite user database (`data/`, `*.db`) and `.env` files are git-ignored and must never be committed.

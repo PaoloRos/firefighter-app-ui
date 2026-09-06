@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parent.parent
 IGNORED_DIRECTORIES = {
     ".git",
     ".venv",
+    "data",
     "dist",
     "node_modules",
     "playwright-report",

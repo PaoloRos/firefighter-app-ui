@@ -1,7 +1,6 @@
 """Final architecture, security, and lifecycle checks for calendar conversion."""
 
 import ast
-from collections.abc import Generator
 import inspect
 from importlib.metadata import version
 import json
@@ -19,7 +18,6 @@ from starlette import formparsers
 import firefighter_tools_backend.adapters.calendar_conversion as adapter
 import firefighter_tools_backend.routes.calendar_converter as route
 import firefighter_tools_backend.services.calendar_conversion as service
-from firefighter_tools_backend import create_app
 from firefighter_tools_backend.domain.upload import ValidatedUpload
 
 PROJECT_ROOT = Path(__file__).parents[2]
@@ -28,12 +26,6 @@ CSV_HEADER = (
     "id,summary,all_date,start_date,start_time,end_date,end_time,"
     "location,description\n"
 )
-
-
-@pytest.fixture
-def client() -> Generator[TestClient]:
-    with TestClient(create_app()) as test_client:
-        yield test_client
 
 
 def _imported_modules(module: ModuleType) -> set[str]:

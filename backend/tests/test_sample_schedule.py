@@ -7,7 +7,6 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 from openpyxl import load_workbook
 
-from firefighter_tools_backend import create_app
 from firefighter_tools_backend.services.calendar_conversion import (
     convert_calendar,
 )
@@ -87,11 +86,12 @@ def test_sample_converts_all_events_with_calendar_conversion_v020() -> None:
     assert "LOCATION:Übungsplatz" in result.ics_text
 
 
-def test_sample_is_downloaded_from_one_stable_application_url() -> None:
-    with TestClient(create_app()) as client:
-        response = client.get(
-            "/api/v1/tools/calendar-converter/example",
-        )
+def test_sample_is_downloaded_from_one_stable_application_url(
+    client: TestClient,
+) -> None:
+    response = client.get(
+        "/api/v1/tools/calendar-converter/example",
+    )
 
     assert response.status_code == 200
     assert response.content == ASSET_PATH.read_bytes()
@@ -104,22 +104,23 @@ def test_sample_is_downloaded_from_one_stable_application_url() -> None:
     )
 
 
-def test_endpoint_accepts_the_sample_as_a_successful_upload() -> None:
-    with TestClient(create_app()) as client:
-        with ASSET_PATH.open("rb") as source:
-            response = client.post(
-                "/api/v1/tools/calendar-converter/convert",
-                files={
-                    "file": (
-                        ASSET_PATH.name,
-                        source,
-                        (
-                            "application/vnd.openxmlformats-officedocument."
-                            "spreadsheetml.sheet"
-                        ),
-                    )
-                },
-            )
+def test_endpoint_accepts_the_sample_as_a_successful_upload(
+    client: TestClient,
+) -> None:
+    with ASSET_PATH.open("rb") as source:
+        response = client.post(
+            "/api/v1/tools/calendar-converter/convert",
+            files={
+                "file": (
+                    ASSET_PATH.name,
+                    source,
+                    (
+                        "application/vnd.openxmlformats-officedocument."
+                        "spreadsheetml.sheet"
+                    ),
+                )
+            },
+        )
 
     assert response.status_code == 200
     payload = response.json()

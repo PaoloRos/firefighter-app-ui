@@ -3,15 +3,10 @@
 from enum import StrEnum
 from typing import Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import Field, model_validator
 
 from firefighter_tools_backend.domain.calendar_conversion import IssueCode
-
-
-class ContractModel(BaseModel):
-    """Base model that rejects fields outside the documented API contract."""
-
-    model_config = ConfigDict(extra="forbid")
+from firefighter_tools_backend.models.base import ContractModel
 
 
 class ConversionStatus(StrEnum):

@@ -22,6 +22,44 @@ make setup
 
 The command creates `backend/.venv`, installs the backend with its test dependencies, installs the exact frontend dependency versions from `frontend/pnpm-lock.yaml`, and installs Playwright's managed Chromium runtime. Initial setup requires internet access for missing dependencies and browser binaries. It is safe to run again after dependency changes.
 
+## User accounts
+
+The application requires a local account to sign in. Accounts live in a SQLite
+database at `data/firefighter.db` by default (override with
+`FIREFIGHTER_TOOLS_DATABASE_URL`); the `data/` directory and every `*.db` file
+are git-ignored and must never be committed. The signed session cookie is
+signed with `FIREFIGHTER_TOOLS_SECRET_KEY`, which falls back to an insecure
+development-only value when unset.
+
+Two roles exist:
+
+- `super_user` — may upload schedules to the calendar converter, and may do
+  everything a `user` can.
+- `user` — may sign in, use read-only tool features, and download the example
+  schedule. Personalised calendar downloads are planned for a later version.
+
+Create the first `super_user` before the first sign-in. Passwords are prompted
+for twice, are never echoed back or written to logs, and are stored only as
+`hashlib.scrypt` hashes.
+
+```shell
+backend/.venv/bin/python -m firefighter_tools_backend create-user --username chief --role super_user
+```
+
+Optional profile flags: `--name`, `--surname`, `--rank`, `--zug`, `--gruppe`.
+
+Manage existing accounts with the companion subcommands:
+
+```shell
+backend/.venv/bin/python -m firefighter_tools_backend list-users
+backend/.venv/bin/python -m firefighter_tools_backend set-password --username chief
+backend/.venv/bin/python -m firefighter_tools_backend delete-user --username chief
+```
+
+`list-users` prints one `username`, role, and profile line per account and
+never prints a password hash. `set-password` and `delete-user` exit non-zero
+when the named account does not exist.
+
 ## Development
 
 Start FastAPI and Vite together:

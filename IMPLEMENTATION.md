@@ -1007,4 +1007,23 @@ Use component tests for deterministic state and accessibility behavior, followed
 
 **Ask:** Provide commands to create, list, update the password of, and delete users, plus first-run documentation for creating the initial super-user.
 
-**Status:** NOT COMPLETED — queued for implementation. Answer, automated test, and developer demo will be filled in once the work is delivered and verified.
+**Answer:** Extended `python -m firefighter_tools_backend` with three account-management subcommands alongside the existing `create-user`. `list-users` prints one `username`, role, and non-empty-profile line per account, ordered by username, and never prints a password hash. `set-password --username <name>` prompts for a new password twice through `getpass` (never echoed or logged) and replaces the stored `hashlib.scrypt` hash. `delete-user --username <name>` removes an account. `set-password` and `delete-user` exit `1` for an unknown account and `set-password` exits `2` on a mismatched confirmation, matching `create-user`'s conventions; all three reuse the existing `services/auth` and `adapters/user_repository` layers with no new HTTP surface. Added a "User accounts" section to `README.md` covering the two roles, the `data/firefighter.db` location and the `FIREFIGHTER_TOOLS_DATABASE_URL` / `FIREFIGHTER_TOOLS_SECRET_KEY` settings, the git-ignored `data/` and `*.db` files, the first-run `create-user --role super_user` step, and the companion commands. Extended `backend/tests/test_user_cli.py` from three to ten tests covering the list / set-password / delete round trip, the hash-free listing, the empty-database message, and every non-zero exit path. Verified 99 backend tests, `make test` end to end (backend, frontend 78 unchanged, integration 10, Playwright e2e 10, verify), `pip check`, and a clean `git diff --check`, plus a manual walk-through of all four subcommands against a scratch database.
+
+**Automated test:**
+
+1. From the repository root, run `make test-backend` and confirm that 99 tests pass, including the 10 in `backend/tests/test_user_cli.py`.
+2. Run `make test` and confirm the backend (99), frontend (78), integration (10), Playwright e2e (10), and verify stages all pass.
+3. Run `git diff --check` and confirm that it produces no output.
+
+**Developer demo:**
+
+1. From the repository root, point at a scratch database and create two accounts, entering a password twice at each prompt:
+   ```
+   export FIREFIGHTER_TOOLS_DATABASE_URL="sqlite:///$(pwd)/data/demo.db"
+   backend/.venv/bin/python -m firefighter_tools_backend create-user --username chief --role super_user --name Anna
+   backend/.venv/bin/python -m firefighter_tools_backend create-user --username member --role user
+   ```
+2. Run `backend/.venv/bin/python -m firefighter_tools_backend list-users` and confirm it prints `chief` as `super_user (name=Anna)` and `member` as `user`, with no password hash.
+3. Run `backend/.venv/bin/python -m firefighter_tools_backend set-password --username member`, enter a new password twice, and confirm `Updated the password for 'member'.`; repeat with `--username ghost` and confirm it prints `User 'ghost' does not exist.` and exits non-zero.
+4. Run `backend/.venv/bin/python -m firefighter_tools_backend delete-user --username member`, confirm `Deleted account 'member'.`, then rerun `list-users` and confirm only `chief` remains.
+5. Remove the scratch database and unset the override: `rm data/demo.db` and `unset FIREFIGHTER_TOOLS_DATABASE_URL`.

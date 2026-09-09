@@ -39,6 +39,23 @@ def _build_parser() -> argparse.ArgumentParser:
     for field in _PROFILE_ARGUMENTS:
         create_user.add_argument(f"--{field}")
 
+    subcommands.add_parser(
+        "list-users",
+        help="List local accounts and roles without password hashes.",
+    )
+
+    set_password = subcommands.add_parser(
+        "set-password",
+        help="Replace the password of an existing local account.",
+    )
+    set_password.add_argument("--username", required=True)
+
+    delete_user = subcommands.add_parser(
+        "delete-user",
+        help="Delete a local application account.",
+    )
+    delete_user.add_argument("--username", required=True)
+
     return parser
 
 
@@ -84,11 +101,82 @@ def _create_user(arguments: argparse.Namespace) -> int:
     return 0
 
 
+def _list_users() -> int:
+    init_db()
+    session = create_session()
+    try:
+        users = user_repository.list_all(session)
+    finally:
+        session.close()
+
+    if not users:
+        print("No accounts found.")
+        return 0
+
+    for user in users:
+        profile = ", ".join(
+            f"{field}={getattr(user, field)}"
+            for field in _PROFILE_ARGUMENTS
+            if getattr(user, field)
+        )
+        details = f" ({profile})" if profile else ""
+        print(f"{user.username}\t{user.role.value}{details}")
+    return 0
+
+
+def _set_password(arguments: argparse.Namespace) -> int:
+    password = _prompt_new_password()
+    if password is None:
+        return 2
+
+    init_db()
+    session = create_session()
+    try:
+        changed = auth.set_password(session, arguments.username, password)
+    finally:
+        session.close()
+
+    if not changed:
+        print(
+            f"User {arguments.username!r} does not exist.",
+            file=sys.stderr,
+        )
+        return 1
+
+    print(f"Updated the password for {arguments.username!r}.")
+    return 0
+
+
+def _delete_user(arguments: argparse.Namespace) -> int:
+    init_db()
+    session = create_session()
+    try:
+        deleted = user_repository.delete(session, arguments.username)
+    finally:
+        session.close()
+
+    if not deleted:
+        print(
+            f"User {arguments.username!r} does not exist.",
+            file=sys.stderr,
+        )
+        return 1
+
+    print(f"Deleted account {arguments.username!r}.")
+    return 0
+
+
 def main() -> None:
     """Dispatch to a management subcommand or start the local server."""
     arguments = _build_parser().parse_args()
     if arguments.command == "create-user":
         raise SystemExit(_create_user(arguments))
+    if arguments.command == "list-users":
+        raise SystemExit(_list_users())
+    if arguments.command == "set-password":
+        raise SystemExit(_set_password(arguments))
+    if arguments.command == "delete-user":
+        raise SystemExit(_delete_user(arguments))
     run(frontend_dist=arguments.frontend_dist)
 
 

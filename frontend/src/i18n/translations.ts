@@ -93,6 +93,27 @@ export const germanTranslations = {
   issueEndDateBeforeStartDate: "Das Enddatum liegt vor dem Startdatum.",
   issueEndTimeBeforeStartTime: "Die Endzeit liegt vor der Startzeit.",
   issueDuplicateId: "Die Ereignis-ID wurde mehrfach verwendet.",
+  authCheckingSession: "Anmeldung wird geprüft …",
+  authSignInEyebrow: "Zugang",
+  authSignInTitle: "Bei Feuerwehr Tools anmelden",
+  authSignInIntro:
+    "Melden Sie sich mit Ihrem lokalen Konto an, um die Werkzeuge zu verwenden.",
+  authUsername: "Benutzername",
+  authPassword: "Passwort",
+  authSignIn: "Anmelden",
+  authSigningIn: "Anmeldung läuft …",
+  authSignOut: "Abmelden",
+  authSignedInAs: "Angemeldet als",
+  authAccountMenuLabel: "Konto",
+  authInvalidCredentials: "Benutzername oder Passwort ist falsch.",
+  authSessionExpired:
+    "Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.",
+  authUnexpectedError: "Die Anmeldung ist unerwartet fehlgeschlagen.",
+  roleSuperUser: "Super-User",
+  roleUser: "Benutzer",
+  converterUploadRestrictedTitle: "Upload ist eingeschränkt",
+  converterUploadRestricted:
+    "Das Hochladen von Dienstplänen ist Super-User-Konten vorbehalten. Personalisierte Kalender-Downloads folgen in einer späteren Version.",
 } as const;
 
 export type TranslationKey = keyof typeof germanTranslations;
@@ -188,6 +209,27 @@ export const italianTranslations = {
   issueEndDateBeforeStartDate: "La data di fine precede la data di inizio.",
   issueEndTimeBeforeStartTime: "L'ora di fine precede l'ora di inizio.",
   issueDuplicateId: "L'ID dell'evento è stato usato più volte.",
+  authCheckingSession: "Verifica dell'accesso …",
+  authSignInEyebrow: "Accesso",
+  authSignInTitle: "Accedi a Feuerwehr Tools",
+  authSignInIntro:
+    "Accedi con il tuo account locale per utilizzare gli strumenti.",
+  authUsername: "Nome utente",
+  authPassword: "Password",
+  authSignIn: "Accedi",
+  authSigningIn: "Accesso in corso …",
+  authSignOut: "Esci",
+  authSignedInAs: "Connesso come",
+  authAccountMenuLabel: "Account",
+  authInvalidCredentials: "Nome utente o password non validi.",
+  authSessionExpired: "La sessione è scaduta. Accedi di nuovo.",
+  authUnexpectedError:
+    "L'accesso non è riuscito a causa di un errore imprevisto.",
+  roleSuperUser: "Super-utente",
+  roleUser: "Utente",
+  converterUploadRestrictedTitle: "Il caricamento è riservato",
+  converterUploadRestricted:
+    "Il caricamento dei piani dei turni è riservato agli account super-utente. I download di calendari personalizzati arriveranno in una versione futura.",
 } satisfies TranslationDictionary;
 
 export const translations = {

@@ -15,6 +15,7 @@ import {
   convertCalendar,
   type InvalidEvent,
 } from "../api/calendarConverter";
+import { RequireSuperUser } from "../components/RequireSuperUser";
 import { useI18n } from "../i18n/I18nProvider";
 
 export const EXAMPLE_SCHEDULE_URL =
@@ -172,108 +173,117 @@ export function CalendarConverterPage() {
           </a>
         </aside>
 
-        <form className="upload-form" onSubmit={handleSubmit}>
-          <div
-            className={`drop-zone${isDragging ? " dragging" : ""}`}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-          >
-            <p className="drop-zone-title">{t("calendarDropTitle")}</p>
-            <p>{t("calendarDropHint")}</p>
-            <input
-              ref={inputRef}
-              className="visually-hidden"
-              id="calendar-schedule-file"
-              type="file"
-              accept=".csv,.xlsx"
-              aria-describedby={fileDescriptionIds}
-              disabled={isConverting}
-              onChange={handleFileChange}
-            />
-            <label
-              className="file-picker-button"
-              htmlFor="calendar-schedule-file"
-              aria-disabled={isConverting}
-            >
-              {selectedFile === null
-                ? t("calendarChooseFile")
-                : t("calendarChooseAnother")}
-            </label>
-            <p
-              className="file-requirements"
-              id="calendar-file-requirements"
-            >
-              {t("calendarFileRequirements")}
-            </p>
-          </div>
-
-          {isConverting ? (
-            <p
-              className="visually-hidden"
-              role="status"
-              aria-live="polite"
-              aria-atomic="true"
-            >
-              {t("calendarConverting")}
-            </p>
-          ) : null}
-
-          {selectedFile !== null ? (
-            <div className="selected-file" aria-live="polite">
-              <span>{t("calendarSelectedFile")}</span>
-              <strong>{selectedFile.name}</strong>
+        <RequireSuperUser
+          fallback={
+            <div className="upload-restricted" role="note">
+              <h2>{t("converterUploadRestrictedTitle")}</h2>
+              <p>{t("converterUploadRestricted")}</p>
             </div>
-          ) : null}
-
-          {workflow.status === "result" ? (
-            <ConversionResultPanel result={workflow.result} />
-          ) : null}
-          {workflow.status === "fatal" ? (
-            <section
-              className="result-panel fatal-result"
-              role="alert"
-              aria-labelledby="calendar-fatal-title"
+          }
+        >
+          <form className="upload-form" onSubmit={handleSubmit}>
+            <div
+              className={`drop-zone${isDragging ? " dragging" : ""}`}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
             >
-              <h2
-                id="calendar-fatal-title"
-                ref={outcomeHeadingRef}
-                tabIndex={-1}
+              <p className="drop-zone-title">{t("calendarDropTitle")}</p>
+              <p>{t("calendarDropHint")}</p>
+              <input
+                ref={inputRef}
+                className="visually-hidden"
+                id="calendar-schedule-file"
+                type="file"
+                accept=".csv,.xlsx"
+                aria-describedby={fileDescriptionIds}
+                disabled={isConverting}
+                onChange={handleFileChange}
+              />
+              <label
+                className="file-picker-button"
+                htmlFor="calendar-schedule-file"
+                aria-disabled={isConverting}
               >
-                {t("calendarFatalTitle")}
-              </h2>
+                {selectedFile === null
+                  ? t("calendarChooseFile")
+                  : t("calendarChooseAnother")}
+              </label>
               <p
-                id={
-                  hasFileValidationError
-                    ? "calendar-file-validation"
-                    : undefined
-                }
+                className="file-requirements"
+                id="calendar-file-requirements"
               >
-                {translateApiError(workflow.errorCode)}
+                {t("calendarFileRequirements")}
               </p>
-            </section>
-          ) : null}
+            </div>
 
-          <div className="form-actions">
-            <button
-              className="primary-button"
-              type="submit"
-              disabled={workflow.status !== "selected"}
-            >
-              {isConverting
-                ? t("calendarConverting")
-                : t("calendarSubmit")}
-            </button>
-            <button
-              className="secondary-button"
-              type="button"
-              disabled={workflow.status === "idle" || isConverting}
-              onClick={resetWorkflow}
-            >
-              {t("calendarReset")}
-            </button>
-          </div>
-        </form>
+            {isConverting ? (
+              <p
+                className="visually-hidden"
+                role="status"
+                aria-live="polite"
+                aria-atomic="true"
+              >
+                {t("calendarConverting")}
+              </p>
+            ) : null}
+
+            {selectedFile !== null ? (
+              <div className="selected-file" aria-live="polite">
+                <span>{t("calendarSelectedFile")}</span>
+                <strong>{selectedFile.name}</strong>
+              </div>
+            ) : null}
+
+            {workflow.status === "result" ? (
+              <ConversionResultPanel result={workflow.result} />
+            ) : null}
+            {workflow.status === "fatal" ? (
+              <section
+                className="result-panel fatal-result"
+                role="alert"
+                aria-labelledby="calendar-fatal-title"
+              >
+                <h2
+                  id="calendar-fatal-title"
+                  ref={outcomeHeadingRef}
+                  tabIndex={-1}
+                >
+                  {t("calendarFatalTitle")}
+                </h2>
+                <p
+                  id={
+                    hasFileValidationError
+                      ? "calendar-file-validation"
+                      : undefined
+                  }
+                >
+                  {translateApiError(workflow.errorCode)}
+                </p>
+              </section>
+            ) : null}
+
+            <div className="form-actions">
+              <button
+                className="primary-button"
+                type="submit"
+                disabled={workflow.status !== "selected"}
+              >
+                {isConverting
+                  ? t("calendarConverting")
+                  : t("calendarSubmit")}
+              </button>
+              <button
+                className="secondary-button"
+                type="button"
+                disabled={workflow.status === "idle" || isConverting}
+                onClick={resetWorkflow}
+              >
+                {t("calendarReset")}
+              </button>
+            </div>
+          </form>
+        </RequireSuperUser>
       </div>
 
       <Link className="text-link" to="/">

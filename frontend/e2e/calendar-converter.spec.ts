@@ -3,12 +3,19 @@ import { existsSync } from "node:fs";
 import { readdir } from "node:fs/promises";
 import path from "node:path";
 
+import { E2E_SUPER_USER } from "./credentials";
+import { signIn } from "./helpers";
+
 const repositoryRoot = path.resolve(import.meta.dirname, "../..");
 const fixtures = path.resolve(import.meta.dirname, "fixtures");
 const exampleSchedule = path.join(
   repositoryRoot,
   "assets/examples/calendar_schedule_example.xlsx",
 );
+
+test.beforeEach(async ({ page }) => {
+  await signIn(page, E2E_SUPER_USER);
+});
 
 test("converts the example XLSX and persists an explicit Italian choice", async ({
   page,

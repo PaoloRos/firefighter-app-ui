@@ -978,3 +978,33 @@ Use component tests for deterministic state and accessibility behavior, followed
 4. Sign in as the super-user: `curl -s -c jar -X POST 127.0.0.1:8000/api/v1/auth/login -H 'content-type: application/json' -d '{"username":"chief","password":"<password>"}'` returns the profile JSON, and `curl -s -b jar 127.0.0.1:8000/api/v1/auth/me` returns the same account.
 5. With `-b jar`, confirm the same conversion `curl` now prints `200`; sign in as `member` into a second cookie jar and confirm the conversion prints `403` (`{"code":"forbidden"}`) while `GET /api/v1/tools/calendar-converter/example` prints `200`.
 6. Stop the application with `Ctrl+C`.
+
+### TASK-037 - Frontend identity and role-gated UI
+
+**Ask:** Add a bilingual login screen, an auth context, route guards, a header user menu with sign-out, and hide the calendar-converter upload form from non-`super-user` accounts.
+
+**Answer:** Added a bilingual identity layer to the React frontend. `src/api/auth.ts` is a typed client (`login`, `logout`, `fetchCurrentUser`) mirroring the `SessionUser`/`AuthErrorResponse` contract with runtime type-guards and an `AuthContractError`; it relies on same-origin cookies and never interprets backend message text. `src/auth/AuthProvider.tsx` exposes `useAuth()` with `loading`/`authenticated`/`anonymous` status and re-fetches `GET /api/v1/auth/me` on mount, with an optional synchronous `initialAuth` seam that keeps component tests deterministic. `RequireAuth` guards `/` and `/tools/calendar-converter`, redirecting anonymous visitors to `/login` with the intended route in history state; `RequireSuperUser` gates content by role and doubles as a route guard. `LoginPage` is an accessible German/Italian form with a `role="alert"` error region, stable-code translation (`invalid_credentials` → localized text), and redirect back to the intended route. `UserMenu`, placed in `.header-actions`, shows the signed-in name, a `super_user`/`user` role badge, and a sign-out button that returns to `/login`. The calendar-converter upload `<form>` is wrapped in `RequireSuperUser` with a translated "upload is restricted" panel for plain users, while the inline help and example-schedule download stay visible to every signed-in account. Added `auth*`/`role*`/`converterUploadRestricted*` keys to both dictionaries (the parity test enforces lockstep) and design-system CSS for the login form, user menu, and role badge (44 px targets, visible `:focus-visible`, no 320 px overflow). A shared `renderApp` test helper seeds auth for the existing behavior suites; new suites cover the auth client, the provider, the login page, and the plain-user converter restriction. Playwright gains a deterministic throwaway `data/e2e.db` that `playwright.config.ts` starts clean, `globalSetup` seeds with a super-user and a plain user via the `create-user` CLI, and `globalTeardown` removes; a `signIn` helper authenticates the existing specs and a new `e2e/access-control.spec.ts` covers the login redirect, invalid credentials, the hidden upload form for a plain user, and sign-out. Verified 78 frontend tests, strict `tsc`, the production build, 92 backend tests (unchanged), 10 production-integration tests, 10 Playwright end-to-end tests, `make verify`, and a clean `git diff --check`.
+
+**Automated test:**
+
+1. From `frontend/`, run `./node_modules/.bin/vitest run` and confirm that 10 test files and 78 tests pass.
+2. From `frontend/`, run `./node_modules/.bin/tsc -b && ./node_modules/.bin/vite build` and confirm that strict type-checking and the production build succeed.
+3. From the repository root, run `make test-backend` and confirm that 92 backend tests pass.
+4. Run `make test-integration` and confirm that the 10 production-frontend and sample-schedule tests pass.
+5. Run `make test-e2e` and confirm that all 10 Playwright tests pass across `e2e/calendar-converter.spec.ts` and `e2e/access-control.spec.ts`.
+6. Run `make verify` and confirm the build succeeds, `pip check` reports `No broken requirements found.`, and the invariant verifier prints `server host: 127.0.0.1` and `retained calendar files: none`.
+7. Run `git diff --check` and confirm that it produces no output.
+
+**Developer demo:**
+
+1. From the repository root, create two accounts in the default `data/firefighter.db`: `backend/.venv/bin/python -m firefighter_tools_backend create-user --username chief --role super_user --name Anna` and `backend/.venv/bin/python -m firefighter_tools_backend create-user --username member --role user --name Ben`, entering a password twice at each prompt.
+2. Run `make run` and open `http://127.0.0.1:8000`; confirm you are redirected to `/login`.
+3. Sign in as `chief`; confirm the dashboard loads, the header shows `Angemeldet als Anna` with a `Super-User` badge and an `Abmelden` button, and the calendar converter shows the CSV/XLSX upload form.
+4. Select `Abmelden`, then sign in as `member`; open the calendar converter and confirm the `Upload ist eingeschränkt` panel replaces the upload form while the workflow help and `XLSX-Beispieldienstplan herunterladen` link still work.
+5. Switch the language to `Italiano` and confirm the login screen, account menu, role badge, and restriction panel are translated. Stop the server with `Ctrl+C`.
+
+### TASK-038 - User administration
+
+**Ask:** Provide commands to create, list, update the password of, and delete users, plus first-run documentation for creating the initial super-user.
+
+**Status:** NOT COMPLETED — queued for implementation. Answer, automated test, and developer demo will be filled in once the work is delivered and verified.

@@ -65,6 +65,22 @@ describe("translation dictionaries", () => {
     );
   });
 
+  it("provides bilingual authentication and access-control text", () => {
+    expect(germanTranslations.authSignIn).toBe("Anmelden");
+    expect(italianTranslations.authSignIn).toBe("Accedi");
+    expect(germanTranslations.roleSuperUser).toBe("Super-User");
+    expect(italianTranslations.roleSuperUser).toBe("Super-utente");
+    expect(germanTranslations.converterUploadRestricted).toContain(
+      "Super-User",
+    );
+    expect(italianTranslations.converterUploadRestricted).toContain(
+      "super-utente",
+    );
+    expect(germanTranslations.authInvalidCredentials).not.toBe(
+      italianTranslations.authInvalidCredentials,
+    );
+  });
+
   it("provides complete bilingual workflow and privacy help", () => {
     for (const dictionary of [
       germanTranslations,

@@ -1,16 +1,11 @@
-import { render, screen, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { App } from "../App";
 import { LANGUAGE_STORAGE_KEY } from "../i18n/I18nProvider";
+import { renderApp } from "../test/renderApp";
 
 function renderDashboard() {
-  return render(
-    <MemoryRouter initialEntries={["/"]}>
-      <App />
-    </MemoryRouter>,
-  );
+  return renderApp("/");
 }
 
 describe("translated tool dashboard", () => {

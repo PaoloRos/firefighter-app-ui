@@ -1,10 +1,4 @@
-import {
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import {
   afterEach,
   beforeEach,
@@ -20,8 +14,8 @@ import {
   type CalendarConverterResult,
   type ConversionResponse,
 } from "../api/calendarConverter";
-import { App } from "../App";
 import { LANGUAGE_STORAGE_KEY } from "../i18n/I18nProvider";
+import { PLAIN_USER, renderApp } from "../test/renderApp";
 
 vi.mock("../api/calendarConverter", async (importOriginal) => {
   const actual =
@@ -43,11 +37,7 @@ const originalRevokeObjectUrl = Object.getOwnPropertyDescriptor(
 );
 
 function renderConverter() {
-  return render(
-    <MemoryRouter initialEntries={["/tools/calendar-converter"]}>
-      <App />
-    </MemoryRouter>,
-  );
+  return renderApp("/tools/calendar-converter");
 }
 
 describe("calendar converter upload workflow", () => {
@@ -573,6 +563,33 @@ describe("calendar converter upload workflow", () => {
     expect(screen.getByText("mixed.ics")).toBeVisible();
     expect(window.localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe("de");
     expect(mockedConvertCalendar).toHaveBeenCalledOnce();
+  });
+
+  it("hides the upload form from a non-super-user account", () => {
+    renderApp("/tools/calendar-converter", { user: PLAIN_USER });
+
+    expect(
+      screen.getByRole("heading", {
+        level: 2,
+        name: "Upload ist eingeschränkt",
+      }),
+    ).toBeVisible();
+    expect(
+      screen.getByText(
+        "Das Hochladen von Dienstplänen ist Super-User-Konten vorbehalten. Personalisierte Kalender-Downloads folgen in einer späteren Version.",
+      ),
+    ).toBeVisible();
+    expect(
+      screen.queryByLabelText("Datei auswählen"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Konvertierung starten" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("link", {
+        name: "XLSX-Beispieldienstplan herunterladen",
+      }),
+    ).toBeVisible();
   });
 
   it.each([320, 1280])(

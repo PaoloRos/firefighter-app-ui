@@ -1,8 +1,12 @@
 import { Link, NavLink, Route, Routes } from "react-router-dom";
 
+import { AuthProvider, type InitialAuth, useAuth } from "./auth/AuthProvider";
+import { RequireAuth } from "./components/RequireAuth";
+import { UserMenu } from "./components/UserMenu";
 import { I18nProvider, useI18n } from "./i18n/I18nProvider";
 import { CalendarConverterPage } from "./pages/CalendarConverterPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { LoginPage } from "./pages/LoginPage";
 
 function NotFoundPage() {
   const { t } = useI18n();
@@ -62,6 +66,8 @@ function GitHubIcon() {
 
 function AppContent() {
   const { t } = useI18n();
+  const { status } = useAuth();
+  const isAuthenticated = status === "authenticated";
 
   return (
     <div className="app-shell">
@@ -76,19 +82,41 @@ function AppContent() {
           <span>{t("brand")}</span>
         </Link>
         <div className="header-actions">
-          <nav aria-label={t("navigationLabel")}>
-            <NavLink className={({ isActive }) => (isActive ? "active" : undefined)} to="/" end>
-              {t("navigationOverview")}
-            </NavLink>
-          </nav>
+          {isAuthenticated ? (
+            <nav aria-label={t("navigationLabel")}>
+              <NavLink
+                className={({ isActive }) => (isActive ? "active" : undefined)}
+                to="/"
+                end
+              >
+                {t("navigationOverview")}
+              </NavLink>
+            </nav>
+          ) : null}
           <LanguageSwitch />
+          {isAuthenticated ? <UserMenu /> : null}
         </div>
       </header>
 
       <main className="page-content" id="main-content" tabIndex={-1}>
         <Routes>
-          <Route path="/" element={<DashboardPage />} />
-          <Route path="/tools/calendar-converter" element={<CalendarConverterPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route
+            path="/"
+            element={
+              <RequireAuth>
+                <DashboardPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/tools/calendar-converter"
+            element={
+              <RequireAuth>
+                <CalendarConverterPage />
+              </RequireAuth>
+            }
+          />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </main>
@@ -103,10 +131,16 @@ function AppContent() {
   );
 }
 
-export function App() {
+type AppProps = {
+  initialAuth?: InitialAuth;
+};
+
+export function App({ initialAuth }: AppProps = {}) {
   return (
     <I18nProvider>
-      <AppContent />
+      <AuthProvider initialAuth={initialAuth}>
+        <AppContent />
+      </AuthProvider>
     </I18nProvider>
   );
 }

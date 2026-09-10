@@ -1027,3 +1027,55 @@ Use component tests for deterministic state and accessibility behavior, followed
 3. Run `backend/.venv/bin/python -m firefighter_tools_backend set-password --username member`, enter a new password twice, and confirm `Updated the password for 'member'.`; repeat with `--username ghost` and confirm it prints `User 'ghost' does not exist.` and exits non-zero.
 4. Run `backend/.venv/bin/python -m firefighter_tools_backend delete-user --username member`, confirm `Deleted account 'member'.`, then rerun `list-users` and confirm only `chief` remains.
 5. Remove the scratch database and unset the override: `rm data/demo.db` and `unset FIREFIGHTER_TOOLS_DATABASE_URL`.
+
+### TASK-039 - Add the "Who are you" home identity panel
+
+**Ask:** After the login, I want a page describing who are you in the home. Something like:
+
+```
+Logged as: `username`
+
+[Capital] `name surname`
+[circled] `rank, zug, gruppe`
+```
+
+I remark that I want a style that is fine at the look.
+
+Name and surname in capital; rank, zug and gruppe must be circled and with a soft background, like other tags aloready present in the page. In particular, the color of zug and gruppe can be something neutral; while for the rank there are specifics colors:
+
+* Kommandant and KDT-Stelvertreter: red
+
+* Zugs Kommandant, Gruppen Kommandant and GKDT-STV: yellow
+
+* others: neutral
+
+Use the following abbreviations:
+
+* Komandant -> KDT
+* ...-Stellvertreter -> ...-STV
+* Zugskommandant -> ZKDT
+* Gruppenkomandant -> GKDT
+* Feuerwehrmann -> FWM
+
+**Answer:** Added a read-only identity panel to the dashboard home page (`frontend/src/components/IdentityPanel.tsx`), rendered between the intro hero and the tools grid. It reads the signed-in account from `useAuth()` and shows the heading `Wer bist du` / `Chi sei`, an `Angemeldet als <username>` line (reusing the existing `authSignedInAs` key), the full name in capitals via CSS `text-transform` (the stored casing is kept for assistive tech and copy), and the rank / Zug / Gruppe as pill tags with soft backgrounds that reuse the existing design tokens (`--color-canvas-accent`, `--color-danger-*`, `--color-warning-*`) and the established `.role-badge`-style base-plus-modifier class pattern. A pure `presentRank` helper (`frontend/src/components/rankPresentation.ts`) resolves the stored rank abbreviation tolerantly — upper-cased, a spelled-out `Stellvertreter` expanded to `STV`, non-alphanumerics stripped — to a canonical label (deputies always shown with the hyphenated `-STV` suffix) and a colour: red for `KDT` / `KDT-STV`, amber for `ZKDT` / `ZKDT-STV` / `GKDT` / `GKDT-STV` (a deputy inherits its base rank's colour), neutral for `FWM` and any unrecognised value, which keeps its raw text. The spelled-out `Feuerwehrmann` is accepted as an alias for `FWM`. Missing profile fields are omitted (no name line, no empty tag, no tag list). The rank tag also carries a visually-hidden `Dienstgrad:` / `Grado:` label so colour is never the only signal. Added `identityHeading`, `identityProfileLabel`, `identityRankLabel`, `identityZugLabel`, and `identityGruppeLabel` to the German and Italian dictionaries; the organisational names `Zug` and `Gruppe` stay German in both languages, and the key-parity test keeps the dictionaries in lockstep. No backend, API, route, or CLI change — `GET /api/v1/auth/me` already returns `rank`, `zug`, and `gruppe`. Verified 99 backend, 93 frontend (up from 78: 7 `rankPresentation`, 5 `IdentityPanel`, 1 dashboard-order, 1 translation spot-check, 1 stylesheet contract), 10 production-integration, and 10 Playwright end-to-end tests, plus strict `tsc -b`, the production build, `pip check`, the invariant verifier (`server host: 127.0.0.1`, `retained calendar files: none`), a clean `git diff --check`, and a live check that `create-user --rank KDT --zug 1 --gruppe 2` persists and is returned verbatim by `GET /api/v1/auth/me`.
+
+**Automated test:**
+
+1. From `frontend/`, run `./node_modules/.bin/vitest run` and confirm that 12 files and 93 tests pass, including `src/components/rankPresentation.test.ts` and `src/components/IdentityPanel.test.tsx`.
+2. From `frontend/`, run `./node_modules/.bin/tsc -b && ./node_modules/.bin/vite build` and confirm that strict type-checking and the production build succeed.
+3. From the repository root, run `make test` and confirm the backend (99), frontend (93), production-integration (10), Playwright end-to-end (10), and verify stages all pass.
+4. Run `git diff --check` and confirm that it produces no output.
+
+**Developer demo:**
+
+1. From the repository root, create accounts with profile ranks, entering a password twice at each prompt:
+   ```
+   backend/.venv/bin/python -m firefighter_tools_backend create-user --username chief --role super_user --name Mario --surname Rossi --rank KDT --zug 1 --gruppe 2
+   backend/.venv/bin/python -m firefighter_tools_backend create-user --username leiter --role user --name Anna --surname Bauer --rank GKDT-STV --zug 2 --gruppe 3
+   backend/.venv/bin/python -m firefighter_tools_backend create-user --username fwm --role user --name Paul --surname Weber --rank FWM
+   ```
+2. Run `make dev`, open `http://127.0.0.1:5173/`, and sign in as `chief`.
+3. Confirm the home page shows, above the tool card: `Angemeldet als chief`, `MARIO ROSSI` in capitals, and three circled soft-background tags — `KDT` in red, `Zug 1` and `Gruppe 2` in neutral.
+4. Sign out and sign in as `leiter`; confirm the rank tag reads `GKDT-STV` in amber. Sign in as `fwm`; confirm `FWM` is a neutral tag with no Zug or Gruppe tag.
+5. Switch `Deutsch` ↔ `Italiano` and confirm the heading (`Wer bist du` / `Chi sei`) and the `Angemeldet als` / `Connesso come` label translate, while the `Zug` and `Gruppe` prefixes and the rank abbreviations stay unchanged.
+6. Resize the browser to about 320 px and confirm the tags wrap with no horizontal scrolling.

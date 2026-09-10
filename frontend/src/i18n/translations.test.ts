@@ -81,6 +81,16 @@ describe("translation dictionaries", () => {
     );
   });
 
+  it("provides bilingual identity-panel labels", () => {
+    expect(germanTranslations.identityHeading).toBe("Wer bist du");
+    expect(italianTranslations.identityHeading).toBe("Chi sei");
+    expect(germanTranslations.identityRankLabel).not.toBe(
+      italianTranslations.identityRankLabel,
+    );
+    expect(germanTranslations.identityZugLabel).toBeTruthy();
+    expect(italianTranslations.identityGruppeLabel).toBeTruthy();
+  });
+
   it("provides complete bilingual workflow and privacy help", () => {
     for (const dictionary of [
       germanTranslations,

@@ -87,6 +87,22 @@ describe("design system stylesheet", () => {
     );
   });
 
+  it("styles the home identity panel and its rank tags", () => {
+    expect(stylesheet).toContain(".identity-panel");
+    expect(stylesheet).toMatch(
+      /\.identity-fullname\s*\{[^}]*text-transform:\s*uppercase/s,
+    );
+    expect(stylesheet).toMatch(
+      /\.identity-tag\s*\{[^}]*border-radius:\s*var\(--radius-pill\)/s,
+    );
+    expect(stylesheet).toMatch(
+      /\.identity-tag-rank-red\s*\{[^}]*var\(--color-danger/s,
+    );
+    expect(stylesheet).toMatch(
+      /\.identity-tag-rank-yellow\s*\{[^}]*var\(--color-warning/s,
+    );
+  });
+
   it("keeps explicit narrow and wide responsive layouts", () => {
     expect(stylesheet).toContain("@media (max-width: 40rem)");
     expect(stylesheet).toContain("@media (min-width: 64rem)");

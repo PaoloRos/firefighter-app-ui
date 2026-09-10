@@ -49,6 +49,21 @@ describe("translated tool dashboard", () => {
     ).toHaveAttribute("href", "/tools/calendar-converter");
   });
 
+  it("renders the identity panel ahead of the tool cards", () => {
+    const { container } = renderDashboard();
+
+    const heading = screen.getByRole("heading", { level: 2, name: "Wer bist du" });
+    const panel = heading.closest("section");
+    const toolsGrid = container.querySelector(".tools-grid");
+    if (panel === null || toolsGrid === null) {
+      throw new Error("Expected the identity panel and the tools grid");
+    }
+    expect(
+      panel.compareDocumentPosition(toolsGrid) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
   it("translates the complete card into Italian", () => {
     window.localStorage.setItem(LANGUAGE_STORAGE_KEY, "it");
     renderDashboard();

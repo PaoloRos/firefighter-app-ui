@@ -1,3 +1,4 @@
+import { IdentityPanel } from "../components/IdentityPanel";
 import { ToolCard } from "../components/ToolCard";
 import { useI18n } from "../i18n/I18nProvider";
 
@@ -23,6 +24,8 @@ export function DashboardPage() {
         <h1 id="dashboard-title">{t("dashboardTitle")}</h1>
         <p>{t("dashboardDescription")}</p>
       </section>
+
+      <IdentityPanel />
 
       <section aria-labelledby="tools-title">
         <h2 id="tools-title">{t("dashboardToolsTitle")}</h2>

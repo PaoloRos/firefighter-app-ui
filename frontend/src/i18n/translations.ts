@@ -114,6 +114,11 @@ export const germanTranslations = {
   converterUploadRestrictedTitle: "Upload ist eingeschränkt",
   converterUploadRestricted:
     "Das Hochladen von Dienstplänen ist Super-User-Konten vorbehalten. Personalisierte Kalender-Downloads folgen in einer späteren Version.",
+  identityHeading: "Wer bist du",
+  identityProfileLabel: "Dienstprofil",
+  identityRankLabel: "Dienstgrad",
+  identityZugLabel: "Zug",
+  identityGruppeLabel: "Gruppe",
 } as const;
 
 export type TranslationKey = keyof typeof germanTranslations;
@@ -230,6 +235,11 @@ export const italianTranslations = {
   converterUploadRestrictedTitle: "Il caricamento è riservato",
   converterUploadRestricted:
     "Il caricamento dei piani dei turni è riservato agli account super-utente. I download di calendari personalizzati arriveranno in una versione futura.",
+  identityHeading: "Chi sei",
+  identityProfileLabel: "Profilo di servizio",
+  identityRankLabel: "Grado",
+  identityZugLabel: "Zug",
+  identityGruppeLabel: "Gruppe",
 } satisfies TranslationDictionary;
 
 export const translations = {

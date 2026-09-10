@@ -1,4 +1,311 @@
-# Plan: user database and role-based access
+# "Who are you" identity panel on the home page
+
+## Context
+
+`TODO.md` now holds a free-form feature note (the queue template was overwritten): after
+login the user wants the **home/dashboard page** to show who is signed in — the username,
+the full name in capitals, and `rank` / `zug` / `gruppe` as circled soft-background tags,
+with the rank tag colour-coded by seniority.
+
+Today the app already authenticates and exposes every field this needs, but nothing renders
+`surname`, `rank`, `zug`, or `gruppe` anywhere — the header `UserMenu` only shows
+`name` (or `username`) plus a role badge. This task adds a read-only profile panel to the
+dashboard. It is **frontend-only**: `GET /api/v1/auth/me` already returns
+`username, role, name, surname, rank, zug, gruppe` (`backend/.../models/auth.py` `SessionUser`),
+and `useAuth().user` already carries all of them (`frontend/src/api/auth.ts` `SessionUser`).
+
+## Decisions (confirmed with the user)
+
+1. **Placement** — a panel on the existing home page (`DashboardPage`, route `/`), inserted
+   between the `.hero` intro and the tools grid. No new route.
+2. **Rank storage** — ranks are stored as the **abbreviations themselves** (`KDT`, `ZKDT`,
+   `GKDT`, `FWM`, `KDT-STV`, `GKDT-STV`, …) via `create-user --rank`. A recognised rank is
+   displayed in its canonical abbreviation (with a hyphenated `...-STV` for deputies); the
+   panel does **not** map full German names → abbreviations. Unknown values render as a
+   neutral tag showing the raw text upper-cased.
+3. **Deputy colour rule** — a deputy inherits its base rank's colour.
+4. **Zug / Gruppe tags** — labelled, e.g. `Zug 1`, `Gruppe 2` (translated prefix + value).
+
+### Rank → colour + canonical label
+
+The stored value is matched **tolerantly** — upper-cased, a spelled-out `STELLVERTRETER`
+expanded to `STV`, then every non-alphanumeric char stripped — so `"KDT-STV"`, `"kdt stv"`,
+`"Kdt–Stv"`, and `"KDT-Stellvertreter"` all resolve to the same rank. A matched rank is then
+**always displayed in its canonical abbreviation**, and a deputy is **always shown with the
+`...-STV` suffix** (never a run-together `KDTSTV`).
+
+| Canonical label (displayed) | Colour  | Token trio used |
+|-----------------------------|---------|-----------------|
+| `KDT`, `KDT-STV`            | red     | `--color-danger` / `-border` / `-surface` |
+| `ZKDT`, `ZKDT-STV`, `GKDT`, `GKDT-STV` | yellow | `--color-warning` / `-border` / `-surface` |
+| `FWM`                      | neutral | `--color-canvas-accent` + `--color-border-strong` + `--color-text` (the existing pill look) |
+| any unrecognised value     | neutral | same neutral pill; label = the raw trimmed value upper-cased, except a value ending in `STV` is rendered `<BASE>-STV` |
+
+`ZKDT-STV` is not in the user's written list but follows from the confirmed deputy rule.
+
+## Scope / non-goals
+
+- No backend, DB, CLI, or API-contract change.
+- No change to the header `UserMenu` (the small header identity and the fuller home panel
+  intentionally overlap).
+- No rank validation added to `create-user` (out of scope; free-form stays free-form).
+- Capitalisation of the name is done with CSS `text-transform`, not by transforming the
+  string — screen readers and copy/paste keep the real casing.
+- Colour is never the only signal: the rank abbreviation text differs (`KDT` vs `FWM`) and a
+  visually-hidden "Dienstgrad:" label precedes it.
+
+## Implementation
+
+### 1. Queue the task as `TASK-039`
+
+Restore the `TODO.md` queue structure (header + `## TASK-039: Add the "Who are you" home
+identity panel` + `**Ask:**` set to the user's current note **verbatim**). Highest recorded
+id is `TASK-038` in `IMPLEMENTATION.md`, so this is `TASK-039`. Use the `/todo-task` skill
+for the queue/history bookkeeping.
+
+### 2. Rank presentation helper — `frontend/src/components/rankPresentation.ts` (new)
+
+Pure, dependency-free, mirrors the existing stable-code pattern
+(`translateApiErrorCode` in `frontend/src/i18n/translations.ts`).
+
+```ts
+export type RankColor = "red" | "yellow" | "neutral";
+export type RankPresentation = { label: string; color: RankColor };
+
+// Keyed by the tolerant match key (see below). Labels are the canonical
+// abbreviations; deputies always carry the hyphenated "-STV" suffix.
+const KNOWN_RANKS: Record<string, RankPresentation> = {
+  KDT:     { label: "KDT",      color: "red" },
+  KDTSTV:  { label: "KDT-STV",  color: "red" },
+  ZKDT:    { label: "ZKDT",     color: "yellow" },
+  ZKDTSTV: { label: "ZKDT-STV", color: "yellow" },
+  GKDT:    { label: "GKDT",     color: "yellow" },
+  GKDTSTV: { label: "GKDT-STV", color: "yellow" },
+  FWM:     { label: "FWM",      color: "neutral" },
+};
+
+export function presentRank(rawRank: string): RankPresentation | null {
+  const trimmed = rawRank.trim();
+  if (trimmed === "") return null;
+
+  const key = trimmed
+    .toUpperCase()
+    .replace(/STELLVERTRETER/g, "STV") // spelled-out deputy → STV
+    .replace(/[^A-Z0-9]/g, "");        // drop hyphens/spaces/punctuation
+
+  const known = KNOWN_RANKS[key];
+  if (known) return known;
+
+  // Unknown rank stays neutral, but a deputy still reads "<BASE>-STV".
+  if (key.length > 3 && key.endsWith("STV")) {
+    return { label: `${key.slice(0, -3)}-STV`, color: "neutral" };
+  }
+  return { label: trimmed.toUpperCase(), color: "neutral" };
+}
+```
+
+### 3. `frontend/src/components/IdentityPanel.tsx` (new)
+
+Follows `UserMenu.tsx` conventions (2-space indent, `useAuth()` + `useI18n()`, early
+`return null` when `user === null`).
+
+Rendered markup:
+
+```tsx
+<section className="panel identity-panel" aria-labelledby="identity-heading">
+  <h2 id="identity-heading" className="identity-heading">{t("identityHeading")}</h2>
+
+  <p className="identity-account">
+    <span className="identity-account-label">{t("authSignedInAs")}</span>
+    <span className="identity-username">{user.username}</span>
+  </p>
+
+  {fullName && <p className="identity-fullname">{fullName}</p>}
+
+  {tags.length > 0 && (
+    <ul className="identity-tags" aria-label={t("identityProfileLabel")}>
+      {rank && (
+        <li className={`identity-tag${rank.color !== "neutral" ? ` identity-tag-rank-${rank.color}` : ""}`}>
+          <span className="visually-hidden">{t("identityRankLabel")}: </span>{rank.label}
+        </li>
+      )}
+      {zug && <li className="identity-tag">{t("identityZugLabel")} {zug}</li>}
+      {gruppe && <li className="identity-tag">{t("identityGruppeLabel")} {gruppe}</li>}
+    </ul>
+  )}
+</section>
+```
+
+Data handling:
+- `fullName = [user.name, user.surname].filter(Boolean).join(" ")` — omit the line when empty.
+- `rank = user.rank ? presentRank(user.rank) : null` — omit the tag when null/blank.
+- `zug` / `gruppe` — trim; omit the tag when null/blank.
+- `.visually-hidden` already exists in `styles.css` (used by the skip link / native picker).
+
+### 4. Wire into `frontend/src/pages/DashboardPage.tsx`
+
+Import `IdentityPanel` and render `<IdentityPanel />` between the closing `</section>` of
+`.hero` and the tools `<section>`. `DashboardPage` does not currently call `useAuth()`;
+it does not need to — the panel reads auth itself. Route `/` is already `RequireAuth`-gated,
+so `user` is present in practice.
+
+### 5. Translation keys — `frontend/src/i18n/translations.ts`
+
+Add the same keys to `germanTranslations` and `italianTranslations` (the parity test in
+`translations.test.ts` enforces identical key sets). Reuse the existing `authSignedInAs`
+key for "Angemeldet als" / "Connesso come".
+
+| key                   | de           | it (confirm org wording) |
+|-----------------------|--------------|--------------------------|
+| `identityHeading`     | `Wer bist du`| `Chi sei`                |
+| `identityProfileLabel`| `Dienstprofil` | `Profilo di servizio`  |
+| `identityRankLabel`   | `Dienstgrad` | `Grado`                  |
+| `identityZugLabel`    | `Zug`        | `Plotone`                |
+| `identityGruppeLabel` | `Gruppe`     | `Squadra`                |
+
+**Loose end to confirm during implementation:** whether Italian should keep `Zug` / `Gruppe`
+as-is (org-internal terms, like the untranslated brand) rather than `Plotone` / `Squadra`.
+Ask the user; it is a one-line change either way.
+
+### 6. Styles — append to `frontend/src/styles.css`
+
+New classes only; **no new tokens** (reuse `--color-danger-*`, `--color-warning-*`,
+`--color-canvas-accent`, `--color-border-strong`, spacing/radius/type scale). Model the pill
+on the existing `.role-badge` / `.tool-formats li`.
+
+```css
+/* Identity panel (home) */
+.identity-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-width: var(--reading-width);
+  margin-bottom: var(--space-8);
+}
+.identity-heading {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+.identity-account { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-2); margin: 0; font-size: var(--font-size-sm); }
+.identity-account-label { color: var(--color-text-muted); font-weight: 650; }
+.identity-username { font-weight: 750; overflow-wrap: anywhere; }
+.identity-fullname {
+  margin: 0;
+  font-size: var(--font-size-heading-sm);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+.identity-tags { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.identity-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.75rem;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas-accent);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  font-weight: 750;
+}
+.identity-tag-rank-red { border-color: var(--color-danger-border); background: var(--color-danger-surface); color: var(--color-danger); }
+.identity-tag-rank-yellow { border-color: var(--color-warning-border); background: var(--color-warning-surface); color: var(--color-warning); }
+```
+
+Tags already wrap (`flex-wrap`), the panel is width-capped, and every value uses
+`overflow-wrap: anywhere`, so there is no 320 px overflow risk. Nothing here is interactive,
+so the 44 px target rule does not apply.
+
+### 7. Tests
+
+- **`frontend/src/components/rankPresentation.test.ts`** (new, pure): `KDT`→
+  `{label:"KDT",color:"red"}`; canonical-label cases `kdt-stv`, `KDTSTV`, `KDT STV`, and
+  `KDT-Stellvertreter` all →`{label:"KDT-STV",color:"red"}`; `ZKDT`→yellow;
+  `ZKDT-STV`→`{label:"ZKDT-STV",color:"yellow"}` (deputy rule); `GKDT`→yellow;
+  `GKDT-STV`→yellow; `FWM`→`{label:"FWM",color:"neutral"}`; unknown (`"Löschmeister"`)→
+  `{label:"LÖSCHMEISTER",color:"neutral"}`; unknown deputy (`"LM-STV"`)→
+  `{label:"LM-STV",color:"neutral"}`; `""` / `"   "`→`null`.
+- **`frontend/src/components/IdentityPanel.test.tsx`** (new): render with
+  `renderApp("/", { user: { ...SUPER_USER, name:"Mario", surname:"Rossi", rank:"KDT", zug:"1", gruppe:"2" } })`
+  (helper at `frontend/src/test/renderApp.tsx`). Assert: "Angemeldet als" + username shown;
+  `.identity-fullname` element contains `Mario Rossi`; rank tag text `KDT` with class
+  `identity-tag-rank-red`; `GKDT-STV` → `identity-tag-rank-yellow`; `FWM` → no rank-colour
+  modifier; visible `Zug 1` / `Gruppe 2`; with `rank/zug/gruppe: null` those tags are absent
+  and, with `name`+`surname` null, `.identity-fullname` is absent; Italian variant via
+  `window.localStorage.setItem(LANGUAGE_STORAGE_KEY, "it")` shows `Connesso come` + the IT
+  prefixes.
+- **`frontend/src/pages/DashboardPage.test.tsx`**: add one assertion that the panel renders
+  (`screen.getByRole("heading", { name: "Wer bist du" })`) ahead of the tool card; confirm
+  the existing `getAllByRole("article")` length-1 assertion still holds (the panel is a
+  `<section>`, not an `article`).
+- **`frontend/src/styles.test.ts`**: extend the contract test — stylesheet contains
+  `.identity-panel`; `.identity-fullname` rule contains `text-transform: uppercase`;
+  `.identity-tag` rule contains `border-radius: var(--radius-pill)`;
+  `.identity-tag-rank-red` references `var(--color-danger`; `.identity-tag-rank-yellow`
+  references `var(--color-warning`.
+- **`frontend/src/i18n/translations.test.ts`**: the key-parity `it()` covers the new keys
+  automatically; add a spot-check that `identityHeading` differs between de and it.
+- Optional: add a line to `frontend/e2e/access-control.spec.ts` asserting the signed-in
+  dashboard shows the "Wer bist du" heading (kept minimal; `make test` already runs e2e).
+
+### 8. Record completion
+
+Move `TASK-039` out of `TODO.md` (back to `_None queued._`) and append the full record to
+`IMPLEMENTATION.md` with `Answer`, `Automated test`, and `Developer demo` sections
+(required since `TASK-004`), filling in the real post-change frontend test count.
+
+## Files
+
+| File | Change |
+|------|--------|
+| `TODO.md` | Restore queue template; add then later remove `TASK-039` |
+| `IMPLEMENTATION.md` | Append the completed `TASK-039` record |
+| `frontend/src/components/rankPresentation.ts` | **new** — `presentRank()` |
+| `frontend/src/components/rankPresentation.test.ts` | **new** |
+| `frontend/src/components/IdentityPanel.tsx` | **new** — the panel |
+| `frontend/src/components/IdentityPanel.test.tsx` | **new** |
+| `frontend/src/pages/DashboardPage.tsx` | render `<IdentityPanel />` between hero and tools |
+| `frontend/src/pages/DashboardPage.test.tsx` | one added assertion |
+| `frontend/src/i18n/translations.ts` | 5 new keys × 2 languages |
+| `frontend/src/i18n/translations.test.ts` | spot-check for `identityHeading` |
+| `frontend/src/styles.css` | append `.identity-*` rules |
+| `frontend/src/styles.test.ts` | contract assertions for the new classes |
+
+## Verification
+
+**Automated (from repo root unless noted):**
+
+1. `cd frontend && ./node_modules/.bin/vitest run` — all suites pass, including the new
+   `rankPresentation` and `IdentityPanel` tests.
+2. From `frontend/`: `./node_modules/.bin/tsc -b && ./node_modules/.bin/vite build` —
+   strict type-check and production build succeed.
+3. `make test` — backend (99, unchanged), frontend (new total), integration, and Playwright
+   e2e stages all pass.
+4. `git diff --check` — no output.
+
+**Developer demo:**
+
+1. Create an account with a full profile:
+   `backend/.venv/bin/python -m firefighter_tools_backend create-user --username chief --role super_user --name Mario --surname Rossi --rank KDT --zug 1 --gruppe 2`
+   (repeat with `--rank GKDT-STV` and `--rank FWM` for other accounts).
+2. `make dev` (or `make run`), open `http://127.0.0.1:5173/`, sign in.
+3. Confirm the home page shows, above the tool card: `Angemeldet als chief`, `MARIO ROSSI`
+   in capitals, and three circled soft-background tags — `KDT` in red, `Zug 1` and
+   `Gruppe 2` in neutral. Sign in as the other accounts and confirm `GKDT-STV` is amber and
+   `FWM` is neutral.
+4. Switch `Deutsch` ↔ `Italiano`: heading, "Angemeldet als"/"Connesso come", and the
+   Zug/Gruppe prefixes translate; abbreviations stay unchanged.
+5. Resize to ~320 px — tags wrap, no horizontal scrolling. Set browser zoom to 200% — the
+   panel reflows without clipping.
+6. Sign in as an account with no `rank`/`zug`/`gruppe`/`surname` and confirm the panel
+   gracefully shows only `Angemeldet als …` and the first name.
+
 
 ## Context
 

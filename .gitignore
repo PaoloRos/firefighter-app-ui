@@ -45,3 +45,4 @@ generated/
 data/
 *.db
 *.sqlite3
+list-users.json

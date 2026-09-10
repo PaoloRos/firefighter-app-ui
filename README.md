@@ -25,11 +25,11 @@ The command creates `backend/.venv`, installs the backend with its test dependen
 ## User accounts
 
 The application requires a local account to sign in. Accounts live in a SQLite
-database at `data/firefighter.db` by default (override with
-`FIREFIGHTER_TOOLS_DATABASE_URL`); the `data/` directory and every `*.db` file
-are git-ignored and must never be committed. The signed session cookie is
-signed with `FIREFIGHTER_TOOLS_SECRET_KEY`, which falls back to an insecure
-development-only value when unset.
+database at `data/firefighter.db` by default (override with the
+`FIREFIGHTER_TOOLS_DATABASE_URL` environment variable). The `data/` directory
+and every `*.db` file are git-ignored and must never be committed. The session
+cookie is signed with `FIREFIGHTER_TOOLS_SECRET_KEY`, which falls back to an
+insecure development-only value when unset.
 
 Two roles exist:
 
@@ -38,27 +38,67 @@ Two roles exist:
 - `user` — may sign in, use read-only tool features, and download the example
   schedule. Personalised calendar downloads are planned for a later version.
 
-Create the first `super_user` before the first sign-in. Passwords are prompted
-for twice, are never echoed back or written to logs, and are stored only as
-`hashlib.scrypt` hashes.
+All account management happens through the `firefighter_tools_backend` module.
+Run the commands from the repository root after `make setup`; the database file
+and its schema are created automatically on first use, and a running server
+picks up new or changed accounts without a restart.
+
+### Add a user
 
 ```shell
 backend/.venv/bin/python -m firefighter_tools_backend create-user --username chief --role super_user
 ```
 
-Optional profile flags: `--name`, `--surname`, `--rank`, `--zug`, `--gruppe`.
+The command prompts for the password twice. It is never echoed back or written
+to logs and is stored only as a `hashlib.scrypt` hash:
 
-Manage existing accounts with the companion subcommands:
-
-```shell
-backend/.venv/bin/python -m firefighter_tools_backend list-users
-backend/.venv/bin/python -m firefighter_tools_backend set-password --username chief
-backend/.venv/bin/python -m firefighter_tools_backend delete-user --username chief
+```text
+Password:
+Confirm password:
+Created super_user account 'chief'.
 ```
 
-`list-users` prints one `username`, role, and profile line per account and
-never prints a password hash. `set-password` and `delete-user` exit non-zero
-when the named account does not exist.
+- `--role` accepts `super_user` or `user` and defaults to `user`. Create at
+  least one `super_user` before the first sign-in.
+- Optional firefighter-profile flags: `--name`, `--surname`, `--rank`, `--zug`,
+  `--gruppe`.
+- Re-running `create-user` with an existing `--username` fails without changing
+  the account.
+
+Add a plain member the same way:
+
+```shell
+backend/.venv/bin/python -m firefighter_tools_backend create-user \
+  --username m.rossi --role user --name Mario --surname Rossi --zug 1 --gruppe 2
+```
+
+### Inspect and maintain accounts
+
+```shell
+# List every account (username, role, profile — never a password hash)
+backend/.venv/bin/python -m firefighter_tools_backend list-users
+
+# Replace one account's password (prompts twice)
+backend/.venv/bin/python -m firefighter_tools_backend set-password --username chief
+
+# Delete one account
+backend/.venv/bin/python -m firefighter_tools_backend delete-user --username m.rossi
+```
+
+`set-password` and `delete-user` exit non-zero and change nothing when the
+named account does not exist.
+
+### Use a different database file
+
+Point every command (and the server) at the same path through the environment
+variable, for example a throwaway database for experiments:
+
+```shell
+export FIREFIGHTER_TOOLS_DATABASE_URL="sqlite:///$(pwd)/data/scratch.db"
+backend/.venv/bin/python -m firefighter_tools_backend create-user --username test --role super_user
+# ... run make dev / make run in the same shell ...
+unset FIREFIGHTER_TOOLS_DATABASE_URL
+```
 
 ## Development
 

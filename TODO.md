@@ -1,26 +1,11 @@
-# Implementation Task Queue
+# Calendar Converter Tool Experience Improvement
 
-This file holds implementation tasks that are pending or in progress. The user
-adds a task by writing its identifier, title, and `Ask`. The implementing agent
-does not create tasks, rewrite asks, or infer work items.
+Now it's required to improve the experience of the actual available tool.
 
-- Identifiers are sequential (`TASK-036`, `TASK-037`, and so on) and are never
-  reused or renumbered. Look up the highest existing identifier in
-  [`IMPLEMENTATION.md`](IMPLEMENTATION.md), which is the running counter.
-- Before implementation, confirm the entry exists here.
-- After a task is completed and verified, the agent moves it out of this file:
-  the full record (`Ask`, `Answer`, and — from `TASK-004` onward — `Automated
-  test` and `Developer demo`) is appended to [`IMPLEMENTATION.md`](IMPLEMENTATION.md)
-  and the entry is removed from this queue.
+The idea is: a `super-user` can upload source files to the server, and then start the conversion for him-self. While `user` can only start the conversion. In other words, depending on who are you, you can have different experience with respect to the server.
 
-Queue a task with:
+Change also the interface for `user`. Must be shown only what regards the downloading process.
 
-```markdown
-## TASK-0NN: Short descriptive title
+## Future improvements
 
-**Ask:** Brief user-written summary of what is requested.
-```
-
-## Pending tasks
-
-_None queued._
+Depending on the user, are converted just specific committment.

@@ -10,6 +10,11 @@ For the recurring "add a task to `TODO.md` and run it" flow, use the `/todo-task
 skill (`.claude/skills/todo-task/SKILL.md`). Completed tasks are recorded in
 `IMPLEMENTATION.md` and removed from `TODO.md`.
 
+When asked to plan the work described in `TODO.md`, use the `/ai-plan` skill
+(`.claude/skills/ai-plan/SKILL.md`). It writes the plan to `AI-PLAN.md`,
+replacing the previous contents, and stops there — planning never edits code or
+queues a task.
+
 ## Commits
 
 Every commit you create must end with a blank line followed by exactly:

@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../auth/AuthProvider";
@@ -10,7 +10,7 @@ type LocationState = {
 };
 
 export function LoginPage() {
-  const { t } = useI18n();
+  const { language, t } = useI18n();
   const { status, signIn } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -19,6 +19,8 @@ export function LoginPage() {
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorKey, setErrorKey] = useState<TranslationKey | null>(null);
+  const usernameRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
 
   const redirectTo =
     (location.state as LocationState | null)?.from?.pathname ?? "/";
@@ -28,6 +30,23 @@ export function LoginPage() {
       navigate(redirectTo, { replace: true });
     }
   }, [status, redirectTo, navigate]);
+
+  // Enter only submits a form while focus sits inside one of its own fields.
+  // Put the caret in a field on arrival, and again after a header language
+  // switch, which otherwise leaves focus on the language button where Enter
+  // silently re-activates that button instead of signing in. The field values
+  // are read from the DOM so typing does not re-trigger this effect.
+  useEffect(() => {
+    if (status === "authenticated") {
+      return;
+    }
+
+    const target =
+      usernameRef.current?.value === ""
+        ? usernameRef.current
+        : passwordRef.current;
+    target?.focus();
+  }, [language, status]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -72,6 +91,7 @@ export function LoginPage() {
         <div className="login-field">
           <label htmlFor="login-username">{t("authUsername")}</label>
           <input
+            ref={usernameRef}
             id="login-username"
             name="username"
             type="text"
@@ -88,6 +108,7 @@ export function LoginPage() {
         <div className="login-field">
           <label htmlFor="login-password">{t("authPassword")}</label>
           <input
+            ref={passwordRef}
             id="login-password"
             name="password"
             type="password"

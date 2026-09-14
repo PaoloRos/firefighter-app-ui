@@ -1157,3 +1157,24 @@ This task also absorbed an unrelated change the project owner made to `assets/ex
 2. Sign in as a `super_user`, open the calendar converter, and confirm the help aside still ends with the `XLSX-Beispieldienstplan herunterladen` link and that clicking it downloads `calendar_schedule_example.xlsx`.
 3. Sign out, sign in as a plain `user`, and open the calendar converter. Confirm the help aside lists only the convert and download steps and shows no example-download link.
 4. Confirm the plain user can still press `Kalender erstellen` and download the generated ICS, so nothing it needs was removed.
+
+### TASK-043 - Keep the login form focused so Enter always signs in
+
+**Ask:** In the login page, each time that I'm in the login page, if I press enter, I want to start the login process. Implement the suggested fix: autofocus the username field on mount, and return focus into the form after a language switch on the login page.
+
+**Answer:** Diagnosed first: the login form was already correct (`<form onSubmit>` with a `type="submit"` button), and Enter was never language-dependent. HTML implicit submission fires only while focus sits inside a field of that form, and the language switch is a pair of `type="button"` elements in the site header, outside it. Clicking one moves focus onto that button, where Enter silently re-activates it instead of signing in; driving the running app with a browser confirmed the identical failure after clicking `Deutsch`, so German was never immune — German is simply the default, so it is the one language nobody has to click for. On a fresh page load focus starts on `<body>`, which is the other case where Enter appeared to do nothing. Fixed with one effect in `LoginPage` keyed on `[language, status]` that focuses the first empty field: the username on arrival, and a field again after any language change. It reads the current values from the input refs rather than component state, so typing does not re-trigger it, and it bails out when the session is already authenticated so it cannot fight the redirect effect. When the username is already filled the caret goes to the password field, so Enter submits straight away. Verified 112 frontend tests (up from 108) and 15 Playwright tests (up from 12), `make test` end to end (backend 144, frontend 112, integration 10, e2e 15, verify) and a clean `git diff --check`.
+
+**Automated test:**
+
+1. From the repository root, run `make test-frontend` and confirm 112 tests pass, including the four new focus tests in `frontend/src/pages/LoginPage.test.tsx`.
+2. Run `make test-e2e` and confirm 15 tests pass, including the three in `frontend/e2e/login-keyboard.spec.ts` that sign in with Enter after a language switch in each direction.
+3. Run `make test` and confirm the backend (144), frontend (112), integration (10), Playwright e2e (15), and verify stages all pass.
+4. Run `git diff --check` and confirm that it produces no output.
+
+**Developer demo:**
+
+1. Start the application from the repository root with `make run` and open `http://127.0.0.1:8000`; you are redirected to the login screen.
+2. Without clicking anything, type a username, press `Tab`, type the password, and press `Enter`. Confirm the sign-in starts, which also confirms the caret began in the username field.
+3. Sign out, fill both fields again, then click `Italiano` in the header and press `Enter` without clicking anything else. Confirm the sign-in starts rather than nothing happening.
+4. Repeat step 3 clicking `Deutsch` from the Italian interface and confirm it behaves the same way.
+5. Sign out, type only a username, then click `Italiano`. Confirm the caret lands in the password field so that typing the password and pressing `Enter` signs in.

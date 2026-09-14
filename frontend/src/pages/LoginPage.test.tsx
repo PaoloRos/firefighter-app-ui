@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fetchCurrentUser, login, logout, type SessionUser } from "../api/auth";
 import { AuthProvider } from "../auth/AuthProvider";
 import { I18nProvider, LANGUAGE_STORAGE_KEY } from "../i18n/I18nProvider";
+import { renderApp } from "../test/renderApp";
 import { LoginPage } from "./LoginPage";
 
 vi.mock("../api/auth", () => ({
@@ -90,6 +91,44 @@ describe("LoginPage", () => {
     expect(screen.getByRole("button", { name: "Accedi" })).toBeVisible();
 
     await waitFor(() => expect(mockedFetchCurrentUser).toHaveBeenCalled());
+  });
+
+  it("puts the caret in the username field on arrival", async () => {
+    renderLogin();
+
+    expect(screen.getByLabelText("Benutzername")).toHaveFocus();
+
+    await waitFor(() => expect(mockedFetchCurrentUser).toHaveBeenCalled());
+  });
+
+  it("focuses the form in Italian too", async () => {
+    window.localStorage.setItem(LANGUAGE_STORAGE_KEY, "it");
+    renderLogin();
+
+    expect(screen.getByLabelText("Nome utente")).toHaveFocus();
+
+    await waitFor(() => expect(mockedFetchCurrentUser).toHaveBeenCalled());
+  });
+
+  it("returns focus to the form after a header language switch", () => {
+    // Clicking a language button parks focus on that button, where Enter is a
+    // no-op instead of a sign-in.
+    renderApp("/login", { status: "anonymous", user: null });
+
+    fireEvent.click(screen.getByRole("button", { name: "Italiano" }));
+
+    expect(screen.getByLabelText("Nome utente")).toHaveFocus();
+  });
+
+  it("focuses the password field when the username is already typed", () => {
+    renderApp("/login", { status: "anonymous", user: null });
+
+    fireEvent.change(screen.getByLabelText("Benutzername"), {
+      target: { value: "chief" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Italiano" }));
+
+    expect(screen.getByLabelText("Password")).toHaveFocus();
   });
 
   it("shows a translated error for invalid credentials", async () => {

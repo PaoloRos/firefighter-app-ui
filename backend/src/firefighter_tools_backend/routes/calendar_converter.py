@@ -4,15 +4,22 @@ from pathlib import Path, PurePath
 
 from fastapi import APIRouter, Depends, File, UploadFile, status
 from fastapi.responses import FileResponse, JSONResponse
+from sqlalchemy.orm import Session
 
 from firefighter_tools_backend.dependencies import (
     get_current_user,
+    get_db,
     require_super_user,
 )
 from firefighter_tools_backend.domain.calendar_conversion import (
     ConversionError,
     ConversionErrorCode,
     ConversionResult,
+)
+from firefighter_tools_backend.domain.schedule_store import (
+    ScheduleStoreError,
+    ScheduleStoreErrorCode,
+    StoredSchedule,
 )
 from firefighter_tools_backend.domain.upload import (
     UploadValidationError,
@@ -21,6 +28,8 @@ from firefighter_tools_backend.domain.upload import (
 from firefighter_tools_backend.domain.user import User
 from firefighter_tools_backend.models.auth import AuthErrorResponse
 from firefighter_tools_backend.models.calendar_conversion import (
+    ActiveSchedule,
+    ActiveScheduleResponse,
     Calendar,
     ConversionResponse,
     ConversionStatus,
@@ -29,7 +38,7 @@ from firefighter_tools_backend.models.calendar_conversion import (
     InvalidEvent,
     SourcePosition,
 )
-from firefighter_tools_backend.services import calendar_conversion
+from firefighter_tools_backend.services import calendar_conversion, schedule_store
 from firefighter_tools_backend.services.upload_validation import validate_upload
 
 router = APIRouter(prefix="/tools/calendar-converter", tags=["calendar converter"])
@@ -90,6 +99,19 @@ _CONVERSION_ERRORS = {
     ),
 }
 
+_STORE_ERRORS = {
+    ScheduleStoreErrorCode.NO_ACTIVE_SCHEDULE: (
+        status.HTTP_409_CONFLICT,
+        FatalErrorCode.NO_ACTIVE_SCHEDULE,
+        "No schedule has been uploaded yet.",
+    ),
+    ScheduleStoreErrorCode.STORE_WRITE_ERROR: (
+        status.HTTP_500_INTERNAL_SERVER_ERROR,
+        FatalErrorCode.INTERNAL_ERROR,
+        "The request could not be processed.",
+    ),
+}
+
 
 @router.get(
     "/example",
@@ -105,6 +127,104 @@ def download_example_schedule(
         media_type=_SAMPLE_SCHEDULE_MEDIA_TYPE,
         filename=_SAMPLE_SCHEDULE_PATH.name,
     )
+
+
+@router.put(
+    "/schedule",
+    response_model=ActiveScheduleResponse,
+    responses={
+        401: {"model": AuthErrorResponse},
+        403: {"model": AuthErrorResponse},
+        413: {"model": FatalErrorResponse},
+        415: {"model": FatalErrorResponse},
+        422: {"model": FatalErrorResponse},
+        500: {"model": FatalErrorResponse},
+    },
+)
+async def replace_active_schedule(
+    file: UploadFile | None = File(default=None),
+    current_user: User = Depends(require_super_user),
+    session: Session = Depends(get_db),
+) -> ActiveScheduleResponse | JSONResponse:
+    """Store one validated upload as the schedule every account converts."""
+    if file is None:
+        return _fatal_response(
+            *_UPLOAD_ERRORS[UploadValidationErrorCode.MISSING_FILENAME]
+        )
+
+    try:
+        upload = await validate_upload(file)
+        schedule = schedule_store.save_active_schedule(
+            session,
+            upload,
+            uploaded_by=current_user,
+        )
+        return _active_schedule_response(schedule)
+    except UploadValidationError as error:
+        return _fatal_response(*_UPLOAD_ERRORS[error.code])
+    except ScheduleStoreError as error:
+        return _fatal_response(*_STORE_ERRORS[error.code])
+    except Exception:
+        return _fatal_response(
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            FatalErrorCode.INTERNAL_ERROR,
+            "The request could not be processed.",
+        )
+
+
+@router.get(
+    "/schedule",
+    response_model=ActiveScheduleResponse,
+    responses={401: {"model": AuthErrorResponse}},
+)
+def read_active_schedule(
+    _: User = Depends(get_current_user),
+    session: Session = Depends(get_db),
+) -> ActiveScheduleResponse:
+    """Report the stored schedule, or ``None`` when none is held yet."""
+    schedule = schedule_store.find_active_schedule(session)
+    if schedule is None:
+        return ActiveScheduleResponse(schedule=None)
+    return _active_schedule_response(schedule)
+
+
+@router.post(
+    "/schedule/convert",
+    response_model=ConversionResponse,
+    responses={
+        401: {"model": AuthErrorResponse},
+        409: {"model": FatalErrorResponse},
+        415: {"model": FatalErrorResponse},
+        422: {"model": FatalErrorResponse},
+        500: {"model": FatalErrorResponse},
+    },
+)
+def convert_active_schedule(
+    _: User = Depends(get_current_user),
+    session: Session = Depends(get_db),
+) -> ConversionResponse | JSONResponse:
+    """Convert the stored schedule for any signed-in account."""
+    try:
+        schedule = schedule_store.load_active_schedule(session)
+        with schedule_store.open_active_schedule(schedule) as source:
+            result = calendar_conversion.convert_calendar(
+                source,
+                filename=schedule.original_filename,
+            )
+        return _conversion_response(
+            result,
+            source_filename=schedule.original_filename,
+        )
+    except ScheduleStoreError as error:
+        return _fatal_response(*_STORE_ERRORS[error.code])
+    except ConversionError as error:
+        return _fatal_response(*_CONVERSION_ERRORS[error.code])
+    except Exception:
+        return _fatal_response(
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            FatalErrorCode.INTERNAL_ERROR,
+            "The request could not be processed.",
+        )
 
 
 @router.post(
@@ -198,4 +318,16 @@ def _fatal_response(
     return JSONResponse(
         status_code=status_code,
         content=payload.model_dump(mode="json"),
+    )
+
+
+def _active_schedule_response(schedule: StoredSchedule) -> ActiveScheduleResponse:
+    """Expose the stored schedule without its opaque on-disk filename."""
+    return ActiveScheduleResponse(
+        schedule=ActiveSchedule(
+            filename=schedule.original_filename,
+            size_bytes=schedule.size_bytes,
+            uploaded_at=schedule.uploaded_at,
+            uploaded_by=schedule.uploaded_by,
+        )
     )

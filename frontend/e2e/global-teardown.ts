@@ -1,8 +1,8 @@
 import { existsSync, rmSync } from "node:fs";
 
-import { E2E_DATABASE_FILE } from "./database";
+import { E2E_DATABASE_FILE, E2E_SCHEDULE_STORE } from "./database";
 
-/** Remove the throwaway user database created for the suite. */
+/** Remove the throwaway user database and schedule store created for the suite. */
 export default async function globalTeardown(): Promise<void> {
   for (const suffix of ["", "-wal", "-shm"]) {
     const file = `${E2E_DATABASE_FILE}${suffix}`;
@@ -10,4 +10,6 @@ export default async function globalTeardown(): Promise<void> {
       rmSync(file);
     }
   }
+
+  rmSync(E2E_SCHEDULE_STORE, { recursive: true, force: true });
 }

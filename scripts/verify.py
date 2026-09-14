@@ -1,6 +1,8 @@
 """Verify release-critical local application invariants."""
 
 import json
+import os
+import re
 from importlib.metadata import distribution, version
 from pathlib import Path
 import sys
@@ -15,6 +17,40 @@ IGNORED_DIRECTORIES = {
     "playwright-report",
     "test-results",
 }
+
+
+STORED_SCHEDULE_PATTERN = re.compile(r"^[0-9a-f]{32}\.(csv|xlsx)$")
+
+
+def schedule_store_failures() -> list[str]:
+    """Check the server-held schedule store the .ics sweep skips."""
+    from firefighter_tools_backend.config import (
+        SCHEDULE_STORE_ENV_VAR,
+        settings,
+    )
+
+    failures: list[str] = []
+    store = settings.schedule_store_dir
+
+    if not os.environ.get(SCHEDULE_STORE_ENV_VAR):
+        if not store.is_relative_to(ROOT / "data"):
+            failures.append(
+                f"Default schedule store must live under data/, found {store}"
+            )
+
+    if store.is_dir():
+        for child in sorted(store.iterdir()):
+            if not child.is_file():
+                continue
+            if child.suffix.lower() == ".ics":
+                failures.append(
+                    f"Generated calendar retained in the schedule store: {child.name}"
+                )
+            elif not STORED_SCHEDULE_PATTERN.match(child.name):
+                failures.append(
+                    f"Unexpected file in the schedule store: {child.name}"
+                )
+    return failures
 
 
 def generated_calendars(directory: Path) -> list[Path]:
@@ -66,9 +102,11 @@ def main() -> int:
             + ", ".join(str(path.relative_to(ROOT)) for path in retained_calendars)
         )
 
+    failures.extend(schedule_store_failures())
+
     retained_runtime_directories = [
         directory
-        for directory in (ROOT / "uploads", ROOT / "generated")
+        for directory in (ROOT / "uploads", ROOT / "generated", ROOT / "schedules")
         if directory.exists()
     ]
     if retained_runtime_directories:
@@ -90,6 +128,12 @@ def main() -> int:
     print(f"production frontend: {frontend_index.relative_to(ROOT)}")
     print(f"server host: {HOST}")
     print("retained calendar files: none")
+    from firefighter_tools_backend.config import settings as _settings
+
+    store = _settings.schedule_store_dir
+    stored = len(list(store.iterdir())) if store.is_dir() else 0
+    location = store.relative_to(ROOT) if store.is_relative_to(ROOT) else store
+    print(f"schedule store: {location} ({stored} files)")
     return 0
 
 

@@ -6,10 +6,12 @@ from pathlib import Path
 
 _REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 _DEFAULT_DATABASE_PATH = _REPOSITORY_ROOT / "data" / "firefighter.db"
+_DEFAULT_SCHEDULE_STORE_PATH = _REPOSITORY_ROOT / "data" / "schedules"
 _DEVELOPMENT_SECRET_KEY = "development-only-insecure-session-secret"
 
 DATABASE_URL_ENV_VAR = "FIREFIGHTER_TOOLS_DATABASE_URL"
 SECRET_KEY_ENV_VAR = "FIREFIGHTER_TOOLS_SECRET_KEY"
+SCHEDULE_STORE_ENV_VAR = "FIREFIGHTER_TOOLS_SCHEDULE_STORE"
 
 SESSION_COOKIE_NAME = "firefighter_tools_session"
 SESSION_MAX_AGE_SECONDS = 60 * 60 * 12
@@ -21,6 +23,7 @@ class Settings:
 
     database_url: str
     secret_key: str
+    schedule_store_dir: Path
     session_cookie_name: str = SESSION_COOKIE_NAME
     session_max_age: int = SESSION_MAX_AGE_SECONDS
 
@@ -36,7 +39,17 @@ def load_settings() -> Settings:
         f"sqlite:///{_DEFAULT_DATABASE_PATH}"
     )
     secret_key = os.environ.get(SECRET_KEY_ENV_VAR) or _DEVELOPMENT_SECRET_KEY
-    return Settings(database_url=database_url, secret_key=secret_key)
+    configured_store = os.environ.get(SCHEDULE_STORE_ENV_VAR)
+    schedule_store_dir = (
+        Path(configured_store).expanduser().resolve()
+        if configured_store
+        else _DEFAULT_SCHEDULE_STORE_PATH
+    )
+    return Settings(
+        database_url=database_url,
+        secret_key=secret_key,
+        schedule_store_dir=schedule_store_dir,
+    )
 
 
 settings = load_settings()

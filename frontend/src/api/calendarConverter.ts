@@ -1,5 +1,24 @@
 export const CALENDAR_CONVERTER_ENDPOINT =
   "/api/v1/tools/calendar-converter/convert";
+export const ACTIVE_SCHEDULE_ENDPOINT =
+  "/api/v1/tools/calendar-converter/schedule";
+export const ACTIVE_SCHEDULE_CONVERT_ENDPOINT =
+  "/api/v1/tools/calendar-converter/schedule/convert";
+
+export type ActiveSchedule = {
+  filename: string;
+  size_bytes: number;
+  uploaded_at: string;
+  uploaded_by: string;
+};
+
+export type ActiveScheduleResponse = {
+  schedule: ActiveSchedule | null;
+};
+
+export type ActiveScheduleResult =
+  | { ok: true; response: ActiveScheduleResponse }
+  | { ok: false; status: number; error: FatalErrorResponse };
 
 export type ConversionStatus = "success" | "partial" | "failure";
 
@@ -10,6 +29,7 @@ export type ApiErrorCode =
   | "malformed_csv"
   | "malformed_xlsx"
   | "input_read_error"
+  | "no_active_schedule"
   | "internal_error";
 
 export type ConverterIssueCode =
@@ -87,6 +107,7 @@ const apiErrorCodes = new Set<ApiErrorCode>([
   "malformed_csv",
   "malformed_xlsx",
   "input_read_error",
+  "no_active_schedule",
   "internal_error",
 ]);
 
@@ -251,4 +272,107 @@ function isNonNegativeInteger(value: unknown): value is number {
 
 function isPositiveInteger(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value >= 1;
+}
+
+export async function fetchActiveSchedule(
+  options: ConvertCalendarOptions = {},
+): Promise<ActiveScheduleResult> {
+  const httpResponse = await fetch(ACTIVE_SCHEDULE_ENDPOINT, {
+    signal: options.signal,
+  });
+  return activeScheduleResult(httpResponse);
+}
+
+export async function uploadActiveSchedule(
+  file: File,
+  options: ConvertCalendarOptions = {},
+): Promise<ActiveScheduleResult> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const httpResponse = await fetch(ACTIVE_SCHEDULE_ENDPOINT, {
+    method: "PUT",
+    body: formData,
+    signal: options.signal,
+  });
+  return activeScheduleResult(httpResponse);
+}
+
+export async function convertActiveSchedule(
+  options: ConvertCalendarOptions = {},
+): Promise<CalendarConverterResult> {
+  const httpResponse = await fetch(ACTIVE_SCHEDULE_CONVERT_ENDPOINT, {
+    method: "POST",
+    signal: options.signal,
+  });
+  const payload: unknown = await readJson(httpResponse);
+
+  if (httpResponse.ok) {
+    if (!isConversionResponse(payload)) {
+      throw new CalendarConverterContractError(
+        "The calendar converter returned an invalid success response.",
+      );
+    }
+
+    return { ok: true, response: payload };
+  }
+
+  if (!isFatalErrorResponse(payload)) {
+    throw new CalendarConverterContractError(
+      "The calendar converter returned an invalid error response.",
+    );
+  }
+
+  return { ok: false, status: httpResponse.status, error: payload };
+}
+
+async function activeScheduleResult(
+  httpResponse: Response,
+): Promise<ActiveScheduleResult> {
+  const payload: unknown = await readJson(httpResponse);
+
+  if (httpResponse.ok) {
+    if (!isActiveScheduleResponse(payload)) {
+      throw new CalendarConverterContractError(
+        "The calendar converter returned an invalid schedule response.",
+      );
+    }
+
+    return { ok: true, response: payload };
+  }
+
+  if (!isFatalErrorResponse(payload)) {
+    throw new CalendarConverterContractError(
+      "The calendar converter returned an invalid error response.",
+    );
+  }
+
+  return { ok: false, status: httpResponse.status, error: payload };
+}
+
+function isActiveScheduleResponse(
+  value: unknown,
+): value is ActiveScheduleResponse {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  const { schedule } = value;
+  return schedule === null || isActiveSchedule(schedule);
+}
+
+function isActiveSchedule(value: unknown): value is ActiveSchedule {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.filename === "string" &&
+    value.filename.length > 0 &&
+    isNonNegativeInteger(value.size_bytes) &&
+    typeof value.uploaded_by === "string" &&
+    value.uploaded_by.length > 0 &&
+    typeof value.uploaded_at === "string" &&
+    Number.isFinite(Date.parse(value.uploaded_at))
+  );
 }

@@ -15,10 +15,14 @@ from firefighter_tools_backend.domain.calendar_conversion import (
     ConversionErrorCode,
     ConversionResult,
 )
+from firefighter_tools_backend.domain.schedule_store import (
+    ScheduleStoreErrorCode,
+)
 from firefighter_tools_backend.domain.upload import (
     UploadValidationErrorCode,
     ValidatedUpload,
 )
+from firefighter_tools_backend.models import FatalErrorCode
 from firefighter_tools_backend.services.upload_validation import (
     MAX_UPLOAD_BYTES,
 )
@@ -73,6 +77,25 @@ def test_every_expected_domain_error_has_an_http_mapping() -> None:
     assert {
         status_code for status_code, _, _ in route._CONVERSION_ERRORS.values()
     } == {415, 422}
+    assert set(route._STORE_ERRORS) == set(ScheduleStoreErrorCode)
+    assert {
+        status_code for status_code, _, _ in route._STORE_ERRORS.values()
+    } == {409, 500}
+
+
+def test_every_fatal_error_code_is_reachable_from_a_mapping() -> None:
+    """A code the frontend must translate has to be produced somewhere."""
+    mapped = {
+        code
+        for mapping in (
+            route._UPLOAD_ERRORS,
+            route._CONVERSION_ERRORS,
+            route._STORE_ERRORS,
+        )
+        for _, code, _ in mapping.values()
+    }
+
+    assert mapped | {FatalErrorCode.INTERNAL_ERROR} == set(FatalErrorCode)
 
 
 def test_rejects_conversion_without_a_session(
@@ -153,7 +176,7 @@ def test_returns_success_for_valid_xlsx(client: TestClient) -> None:
         payload["total_count"],
         payload["converted_count"],
         payload["skipped_count"],
-    ) == (3, 3, 0)
+    ) == (1, 1, 0)
     assert payload["calendar"]["filename"] == "calendar_schedule_example.ics"
 
 

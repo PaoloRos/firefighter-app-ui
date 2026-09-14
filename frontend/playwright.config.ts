@@ -6,6 +6,7 @@ import { defineConfig } from "@playwright/test";
 import {
   E2E_DATABASE_FILE,
   E2E_DATABASE_URL,
+  E2E_SCHEDULE_STORE,
   E2E_SECRET_KEY,
 } from "./e2e/database";
 
@@ -20,15 +21,20 @@ if (process.env.TEST_WORKER_INDEX === undefined) {
       rmSync(staleFile);
     }
   }
+  rmSync(E2E_SCHEDULE_STORE, { recursive: true, force: true });
 }
 
 process.env.FIREFIGHTER_TOOLS_DATABASE_URL = E2E_DATABASE_URL;
 process.env.FIREFIGHTER_TOOLS_SECRET_KEY = E2E_SECRET_KEY;
+process.env.FIREFIGHTER_TOOLS_SCHEDULE_STORE = E2E_SCHEDULE_STORE;
 
 export default defineConfig({
   testDir: "./e2e",
   outputDir: "./test-results",
   fullyParallel: false,
+  // The server holds ONE active schedule, so specs share mutable state.
+  // Parallel workers would replace each other's schedule mid-test.
+  workers: 1,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
   reporter: [["list"], ["html", { open: "never" }]],
@@ -50,6 +56,7 @@ export default defineConfig({
     env: {
       FIREFIGHTER_TOOLS_DATABASE_URL: E2E_DATABASE_URL,
       FIREFIGHTER_TOOLS_SECRET_KEY: E2E_SECRET_KEY,
+      FIREFIGHTER_TOOLS_SCHEDULE_STORE: E2E_SCHEDULE_STORE,
     },
   },
 });

@@ -70,11 +70,14 @@ describe("translation dictionaries", () => {
     expect(italianTranslations.authSignIn).toBe("Accedi");
     expect(germanTranslations.roleSuperUser).toBe("Super-User");
     expect(italianTranslations.roleSuperUser).toBe("Super-utente");
-    expect(germanTranslations.converterUploadRestricted).toContain(
+    expect(germanTranslations.calendarActiveScheduleNoneHint).toContain(
       "Super-User",
     );
-    expect(italianTranslations.converterUploadRestricted).toContain(
+    expect(italianTranslations.calendarActiveScheduleNoneHint).toContain(
       "super-utente",
+    );
+    expect(germanTranslations.errorNoActiveSchedule).not.toBe(
+      italianTranslations.errorNoActiveSchedule,
     );
     expect(germanTranslations.authInvalidCredentials).not.toBe(
       italianTranslations.authInvalidCredentials,

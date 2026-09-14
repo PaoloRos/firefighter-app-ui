@@ -3,6 +3,8 @@
 .LSOverride
 *~
 *.swp
+# Excel lock files created while an asset workbook is open
+~$*
 .idea/
 .vscode/
 

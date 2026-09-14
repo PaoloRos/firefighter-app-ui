@@ -1,5 +1,6 @@
 """Public response contract for calendar schedule conversion."""
 
+from datetime import datetime
 from enum import StrEnum
 from typing import Literal, Self
 
@@ -26,6 +27,7 @@ class FatalErrorCode(StrEnum):
     MALFORMED_CSV = "malformed_csv"
     MALFORMED_XLSX = "malformed_xlsx"
     INPUT_READ_ERROR = "input_read_error"
+    NO_ACTIVE_SCHEDULE = "no_active_schedule"
     INTERNAL_ERROR = "internal_error"
 
 
@@ -105,3 +107,18 @@ class FatalErrorResponse(ContractModel):
 
     code: FatalErrorCode
     message: str = Field(min_length=1)
+
+
+class ActiveSchedule(ContractModel):
+    """The schedule currently held on the server, as exposed to clients."""
+
+    filename: str = Field(min_length=1)
+    size_bytes: int = Field(ge=0)
+    uploaded_at: datetime
+    uploaded_by: str = Field(min_length=1)
+
+
+class ActiveScheduleResponse(ContractModel):
+    """The active schedule, or ``None`` when nothing has been uploaded."""
+
+    schedule: ActiveSchedule | None

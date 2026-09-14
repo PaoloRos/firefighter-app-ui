@@ -15,3 +15,12 @@ export const E2E_DATABASE_FILE = path.resolve(
 export const E2E_DATABASE_URL = `sqlite:///${E2E_DATABASE_FILE}`;
 
 export const E2E_SECRET_KEY = "e2e-only-insecure-session-secret";
+
+/**
+ * Throwaway store for the server-held active schedule. Kept beside the
+ * end-to-end database under the git-ignored, verifier-skipped `data/` tree.
+ */
+export const E2E_SCHEDULE_STORE = path.resolve(
+  import.meta.dirname,
+  "../../data/e2e-schedules",
+);

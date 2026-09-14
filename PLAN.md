@@ -10,9 +10,10 @@ The MVP will:
 - Support desktop and responsive mobile layouts.
 - Use German by default, with an Italian language switch.
 - Present a tool dashboard prepared for future programs.
-- Let users upload XLSX or CSV schedules, convert them, review skipped events, and download an ICS calendar.
-- Retain neither uploads nor generated calendars after the request.
-- Include inline guidance and a downloadable example schedule.
+- Let a `super_user` upload an XLSX or CSV schedule that becomes the single active schedule held by the server.
+- Let every signed-in account convert that stored schedule and download an ICS calendar; only a `super_user` reviews skipped events.
+- Retain exactly one active source schedule in a git-ignored store outside the served tree, and retain no generated calendar.
+- Include inline guidance, and offer the downloadable example schedule to the `super_user` accounts that supply one.
 
 ## Architecture and Interfaces
 
@@ -28,10 +29,13 @@ flowchart LR
     end
 
     subgraph API["FastAPI backend"]
-        ENDPOINT["Versioned conversion endpoint"]
+        UPLOAD_ENDPOINT["Schedule upload endpoint<br/>super_user only"]
+        ENDPOINT["Schedule conversion endpoint<br/>any signed-in account"]
         VALIDATION["Upload and request validation"]
         ADAPTER["Calendar-conversion adapter"]
     end
+
+    STORE[("Active schedule store<br/>data/schedules + SQLite row")]
 
     subgraph LIBRARY["Calendar-conversion package"]
         READER["CSV / XLSX readers"]
@@ -41,9 +45,12 @@ flowchart LR
 
     USER --> DASHBOARD
     DASHBOARD --> CONVERTER
-    CONVERTER -->|"Multipart upload"| ENDPOINT
-    ENDPOINT --> VALIDATION
-    VALIDATION --> ADAPTER
+    CONVERTER -->|"Multipart upload<br/>super_user"| UPLOAD_ENDPOINT
+    UPLOAD_ENDPOINT --> VALIDATION
+    VALIDATION -->|"Replaces the active schedule"| STORE
+    CONVERTER -->|"Start conversion"| ENDPOINT
+    STORE -->|"Stored source file"| ENDPOINT
+    ENDPOINT --> ADAPTER
     ADAPTER --> READER
     READER --> EVENT_VALIDATOR
     EVENT_VALIDATOR -->|"Valid events"| GENERATOR
@@ -88,8 +95,14 @@ Implement `POST /api/v1/tools/calendar-converter/convert` with one multipart `fi
 - Use `success` when all events convert, `partial` when valid and invalid events coexist, and `failure` when no event can be converted.
 - Return `413` for oversized uploads, `415` for unsupported types, `422` for malformed schedules, and a generic localized-safe `500` response for unexpected failures.
 - Use stable error codes for frontend translation; never expose tracebacks.
-- Do not persist or log uploaded content. Sanitize filenames and bind the production-like local server only to `127.0.0.1`.
-- Require a `super_user` session for `POST .../convert`; return `401` with a stable `not_authenticated` code when unauthenticated and `403` with `forbidden` when the session is a plain `user`.
+- Never log uploaded content. Sanitize filenames and bind the production-like local server only to `127.0.0.1`.
+- Require a `super_user` session for `POST .../convert`; return `401` with a stable `not_authenticated` code when unauthenticated and `403` with `forbidden` when the session is a plain `user`. This endpoint converts in memory, persists nothing, and is retained as a stateless API with no UI caller.
+
+Three further endpoints operate on the server-held schedule:
+
+- `PUT /api/v1/tools/calendar-converter/schedule` accepts one multipart `file` from a `super_user` and replaces the active schedule. It reuses the same validation as `.../convert` (extension allow-list, 10 MiB ceiling, filename sanitization) and returns the stored schedule's public metadata.
+- `GET /api/v1/tools/calendar-converter/schedule` returns that metadata to any signed-in account, or `{"schedule": null}` when nothing is stored. An empty store is a normal state, not an error.
+- `POST /api/v1/tools/calendar-converter/schedule/convert` converts the stored schedule for any signed-in account and returns the same `ConversionResponse` contract as `.../convert`. It returns `409` with the stable `no_active_schedule` code when the store is empty.
 
 React will create a `text/calendar;charset=utf-8` Blob from the returned ICS text and initiate the download locally.
 
@@ -99,9 +112,21 @@ Store accounts in a local SQLite database (`data/firefighter.db` by default, ove
 
 - Authenticate with Starlette's signed session cookie (`itsdangerous`), keyed from `FIREFIGHTER_TOOLS_SECRET_KEY` with a development-only fallback. The cookie carries only the account id.
 - `POST /api/v1/auth/login` verifies credentials and starts the session; `POST /api/v1/auth/logout` clears it; `GET /api/v1/auth/me` returns the signed-in account without secrets. Failures use stable codes (`invalid_credentials`, `not_authenticated`, `forbidden`) and never expose tracebacks.
-- `super_user` accounts may upload schedules through the converter; every signed-in account may download the example schedule and, later, its own generated calendar.
+- `super_user` accounts may upload schedules through the converter, replace the server-held active schedule, and download the example schedule that shows the required columns; every signed-in account may convert the active schedule and download the resulting calendar.
 - Create and manage accounts with the `python -m firefighter_tools_backend create-user` command; the database file and `.env` are git-ignored and never committed.
 - This does not change the deployment posture: the server still binds `127.0.0.1` only, and internet publication (TLS, rate limiting, session hardening) remains a separate later phase.
+
+### Schedule store
+
+The server holds exactly one active schedule, replaced rather than versioned.
+
+- Files live in `data/schedules/` by default, overridable with `FIREFIGHTER_TOOLS_SCHEDULE_STORE`. The directory is git-ignored through the existing `data/` rule and sits outside the served tree, so a stored schedule is never reachable as a static asset.
+- The on-disk name is an opaque `<uuid4hex>.<csv|xlsx>`. The uploaded filename never reaches the filesystem, so path traversal is structurally impossible; the sanitized original is kept only in the database and is what names the downloaded `.ics`.
+- The singleton `active_schedule` table row is the source of truth. Writes go to a temporary file that is `fsync`ed and then atomically renamed, the row is committed, and only afterwards is every file the row does not name purged. A crash at any point therefore leaves at most a harmless orphan, which the next upload removes.
+- The reverse failure self-heals: when the row names a file that no longer exists, the read path deletes the row and reports an empty store, so `GET .../schedule` and `POST .../schedule/convert` can never disagree.
+- SQLite does not preserve timezone offsets, so stored timestamps are re-attached to UTC when read.
+- Generated calendars are still never written to disk. `scripts/verify.py` asserts the default store stays under `data/`, holds no `.ics`, and contains only opaque `<uuid>.<csv|xlsx>` files.
+- Deleting the active schedule through the API, per-user filtering of commitments, and schedule history are future work. The next schema change to `active_schedule` is the trigger for introducing Alembic, since the MVP relies on `Base.metadata.create_all`.
 
 ## User Experience
 
@@ -161,8 +186,9 @@ flowchart TD
 ## Test Plan and Acceptance Criteria
 
 - Converter tests cover valid CSV/XLSX, partial conversion, all-invalid input, malformed rows, duplicate IDs, unsupported extensions, and unchanged CLI exit/report behavior.
-- API tests cover success, partial and failure payloads, 10 MiB enforcement, malformed uploads, filename sanitization, Unicode, and absence of retained files.
-- Authentication tests cover login success and failure, session `me`/logout, scrypt hashing that never stores plaintext, `401` for unauthenticated conversion, and `403` for a plain `user`; every signed-in account can still download the example schedule.
+- API tests cover success, partial and failure payloads, 10 MiB enforcement, malformed uploads, filename sanitization, Unicode, and the absence of any retained generated calendar.
+- Schedule-store tests cover opaque stored names, replacement that purges the previous file, a failed commit that removes the new file, orphan purging, a self-healing row whose file disappeared, traversal filenames that cannot escape the store, and the `409 no_active_schedule` contract.
+- Authentication tests cover login success and failure, session `me`/logout, scrypt hashing that never stores plaintext, `401` for unauthenticated conversion, and `403` for a plain `user`. `GET .../example` stays open to any signed-in account, but the interface offers it only to a `super_user`, because a plain account never supplies a source file.
 - Frontend tests cover routing, both languages, upload validation, state transitions, issue rendering, partial download, reset behavior, and persisted language choice.
 - End-to-end tests cover dashboard-to-download flows for valid, partially valid, malformed, and all-invalid sample files.
 - Accessibility checks cover keyboard-only use, focus order, semantic labels, screen-reader announcements, contrast, zoom, and phone-sized layouts.
@@ -171,7 +197,7 @@ flowchart TD
 
 ## Assumptions and Later Roadmap
 
-- The application has local accounts in a SQLite user store with `super_user` and `user` roles, but no analytics, background jobs, or server-side history of uploaded or generated files.
+- The application has local accounts in a SQLite user store with `super_user` and `user` roles, and holds exactly one active source schedule on the server. It has no analytics, background jobs, schedule history, or retained generated calendars.
 - A human-authored schedule is small enough for synchronous conversion and JSON delivery.
 - Internet publication is a separate phase requiring explicit decisions about hosting, authentication, authorization, TLS, rate limiting, privacy, monitoring, retention, and deployment.
 - Additional programs will follow the dashboard-card pattern and receive their own versioned API routes and backend adapters.

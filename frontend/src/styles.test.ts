@@ -87,6 +87,22 @@ describe("design system stylesheet", () => {
     );
   });
 
+  it("styles the active schedule card, actions, and upload panel", () => {
+    expect(stylesheet).toContain(".active-schedule");
+    expect(stylesheet).toMatch(/\.active-schedule\s*\{[^}]*border-left:/s);
+    expect(stylesheet).toMatch(
+      /\.active-schedule-empty\s*\{[^}]*border-left-color:\s*var\(--color-warning\)/s,
+    );
+    expect(stylesheet).toMatch(
+      /\.active-schedule-meta\s*\{[^}]*display:\s*grid/s,
+    );
+    expect(stylesheet).toMatch(/\.convert-actions\s*\{[^}]*flex-wrap:\s*wrap/s);
+    expect(stylesheet).toMatch(
+      /\.upload-panel\s*\{[^}]*border-radius:\s*var\(--radius-md\)/s,
+    );
+    expect(stylesheet).not.toContain(".upload-restricted");
+  });
+
   it("styles the home identity panel and its rank tags", () => {
     expect(stylesheet).toContain(".identity-panel");
     expect(stylesheet).toMatch(

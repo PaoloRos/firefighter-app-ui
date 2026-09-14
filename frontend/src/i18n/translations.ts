@@ -42,7 +42,29 @@ export const germanTranslations = {
   calendarHelpPartial:
     "Bei einer Teilkonvertierung enthält der Kalender nur gültige Ereignisse.",
   calendarHelpPrivacy:
-    "Uploads und erzeugte Kalender werden von der Anwendung nicht gespeichert.",
+    "Der hochgeladene Dienstplan bleibt lokal auf diesem Server; erzeugte Kalender werden nicht gespeichert.",
+  calendarActiveScheduleTitle: "Aktueller Dienstplan",
+  calendarActiveScheduleLoading: "Dienstplan wird geladen …",
+  calendarActiveScheduleNone:
+    "Es ist noch kein Dienstplan auf dem Server hinterlegt.",
+  calendarActiveScheduleNoneHint:
+    "Ein Super-User muss zuerst einen Dienstplan hochladen.",
+  calendarActiveScheduleUnavailable:
+    "Der aktuelle Dienstplan konnte nicht geladen werden.",
+  calendarActiveScheduleRetry: "Erneut versuchen",
+  calendarActiveScheduleFilename: "Datei",
+  calendarActiveScheduleUploadedAt: "Hochgeladen am",
+  calendarActiveScheduleUploadedBy: "Hochgeladen von",
+  calendarActiveScheduleSize: "Größe",
+  calendarConvertActive: "Kalender erstellen",
+  calendarUploadTitle: "Dienstplan bereitstellen",
+  calendarUploadSubmit: "Dienstplan hochladen",
+  calendarUploading: "Wird hochgeladen …",
+  calendarUploadReplaceNotice:
+    "Ein neuer Upload ersetzt den aktuellen Dienstplan für alle Konten.",
+  calendarUploadSuccess: "Der Dienstplan wurde auf dem Server hinterlegt.",
+  calendarHelpStepUpload:
+    "Dienstplan hochladen; er ersetzt den bisherigen für alle Konten.",
   calendarExampleDownload: "XLSX-Beispieldienstplan herunterladen",
   calendarDropTitle: "Dienstplan hier ablegen",
   calendarDropHint: "Oder wählen Sie eine Datei auf diesem Gerät aus.",
@@ -87,6 +109,8 @@ export const germanTranslations = {
   errorMalformedCsv: "Die CSV-Datei ist nicht lesbar oder ungültig aufgebaut.",
   errorMalformedXlsx: "Die XLSX-Datei ist nicht lesbar oder ungültig aufgebaut.",
   errorInputRead: "Die hochgeladene Datei konnte nicht gelesen werden.",
+  errorNoActiveSchedule:
+    "Es ist kein Dienstplan hinterlegt. Bitte wenden Sie sich an einen Super-User.",
   errorInternal: "Die Konvertierung ist unerwartet fehlgeschlagen.",
   issueEmptyId: "Die Ereignis-ID fehlt.",
   issueEmptySummary: "Die Zusammenfassung fehlt.",
@@ -111,9 +135,6 @@ export const germanTranslations = {
   authUnexpectedError: "Die Anmeldung ist unerwartet fehlgeschlagen.",
   roleSuperUser: "Super-User",
   roleUser: "Benutzer",
-  converterUploadRestrictedTitle: "Upload ist eingeschränkt",
-  converterUploadRestricted:
-    "Das Hochladen von Dienstplänen ist Super-User-Konten vorbehalten. Personalisierte Kalender-Downloads folgen in einer späteren Version.",
   identityHeading: "Wer bist du",
   identityProfileLabel: "Dienstprofil",
   identityRankLabel: "Dienstgrad",
@@ -163,7 +184,29 @@ export const italianTranslations = {
   calendarHelpPartial:
     "In una conversione parziale, il calendario contiene soltanto gli eventi validi.",
   calendarHelpPrivacy:
-    "I caricamenti e i calendari generati non vengono salvati dall'applicazione.",
+    "Il piano dei turni caricato resta in locale su questo server; i calendari generati non vengono salvati.",
+  calendarActiveScheduleTitle: "Piano dei turni attuale",
+  calendarActiveScheduleLoading: "Caricamento del piano dei turni …",
+  calendarActiveScheduleNone:
+    "Sul server non è ancora presente alcun piano dei turni.",
+  calendarActiveScheduleNoneHint:
+    "Un super-utente deve prima caricare un piano dei turni.",
+  calendarActiveScheduleUnavailable:
+    "Non è stato possibile caricare il piano dei turni attuale.",
+  calendarActiveScheduleRetry: "Riprova",
+  calendarActiveScheduleFilename: "File",
+  calendarActiveScheduleUploadedAt: "Caricato il",
+  calendarActiveScheduleUploadedBy: "Caricato da",
+  calendarActiveScheduleSize: "Dimensione",
+  calendarConvertActive: "Crea il calendario",
+  calendarUploadTitle: "Fornisci il piano dei turni",
+  calendarUploadSubmit: "Carica il piano dei turni",
+  calendarUploading: "Caricamento in corso …",
+  calendarUploadReplaceNotice:
+    "Un nuovo caricamento sostituisce il piano dei turni attuale per tutti gli account.",
+  calendarUploadSuccess: "Il piano dei turni è stato salvato sul server.",
+  calendarHelpStepUpload:
+    "Carica il piano dei turni; sostituisce quello precedente per tutti gli account.",
   calendarExampleDownload: "Scarica il piano dei turni XLSX di esempio",
   calendarDropTitle: "Trascina qui il piano dei turni",
   calendarDropHint: "Oppure scegli un file da questo dispositivo.",
@@ -208,6 +251,8 @@ export const italianTranslations = {
   errorMalformedCsv: "Il file CSV è illeggibile o ha una struttura non valida.",
   errorMalformedXlsx: "Il file XLSX è illeggibile o ha una struttura non valida.",
   errorInputRead: "Non è stato possibile leggere il file caricato.",
+  errorNoActiveSchedule:
+    "Nessun piano dei turni disponibile. Rivolgiti a un super-utente.",
   errorInternal: "La conversione non è riuscita a causa di un errore imprevisto.",
   issueEmptyId: "Manca l'ID dell'evento.",
   issueEmptySummary: "Manca il riepilogo.",
@@ -232,9 +277,6 @@ export const italianTranslations = {
     "L'accesso non è riuscito a causa di un errore imprevisto.",
   roleSuperUser: "Super-utente",
   roleUser: "Utente",
-  converterUploadRestrictedTitle: "Il caricamento è riservato",
-  converterUploadRestricted:
-    "Il caricamento dei piani dei turni è riservato agli account super-utente. I download di calendari personalizzati arriveranno in una versione futura.",
   identityHeading: "Chi sei",
   identityProfileLabel: "Profilo di servizio",
   identityRankLabel: "Grado",
@@ -256,6 +298,7 @@ const apiErrorTranslationKeys = {
   malformed_csv: "errorMalformedCsv",
   malformed_xlsx: "errorMalformedXlsx",
   input_read_error: "errorInputRead",
+  no_active_schedule: "errorNoActiveSchedule",
   internal_error: "errorInternal",
 } satisfies Record<ApiErrorCode, TranslationKey>;
 

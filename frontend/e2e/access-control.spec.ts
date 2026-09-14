@@ -26,26 +26,27 @@ test("rejects invalid credentials with a translated message", async ({
   await expect(page).toHaveURL(/\/login$/);
 });
 
-test("hides the upload form from a plain user but keeps the example download", async ({
+test("hides every upload affordance from a plain user", async ({
   page,
 }) => {
   await signIn(page, E2E_PLAIN_USER);
   await page.goto("/tools/calendar-converter");
 
   await expect(
-    page.getByRole("heading", { name: "Upload ist eingeschränkt" }),
+    page.getByRole("heading", { name: "Aktueller Dienstplan" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Kalender erstellen" }),
   ).toBeVisible();
   await expect(page.getByLabel("Datei auswählen")).toHaveCount(0);
   await expect(
-    page.getByRole("button", { name: "Konvertierung starten" }),
+    page.getByRole("button", { name: "Dienstplan hochladen" }),
   ).toHaveCount(0);
 
-  const downloadPromise = page.waitForEvent("download");
-  await page
-    .getByRole("link", { name: "XLSX-Beispieldienstplan herunterladen" })
-    .click();
-  const download = await downloadPromise;
-  expect(download.suggestedFilename()).toBe("calendar_schedule_example.xlsx");
+  // A plain account never supplies an XLSX, so the template is not offered.
+  await expect(
+    page.getByRole("link", { name: "XLSX-Beispieldienstplan herunterladen" }),
+  ).toHaveCount(0);
 });
 
 test("shows the account menu with a role badge and signs out", async ({

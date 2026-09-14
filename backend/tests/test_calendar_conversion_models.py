@@ -1,9 +1,13 @@
 """Contract tests for calendar conversion response models."""
 
+from datetime import datetime, timezone
+
 import pytest
 from pydantic import ValidationError
 
 from firefighter_tools_backend.models import (
+    ActiveSchedule,
+    ActiveScheduleResponse,
     Calendar,
     ConversionResponse,
     FatalErrorCode,
@@ -151,6 +155,7 @@ def test_fatal_error_code_values_are_stable() -> None:
         "malformed_csv",
         "malformed_xlsx",
         "input_read_error",
+        "no_active_schedule",
         "internal_error",
     ]
 
@@ -163,4 +168,47 @@ def test_contract_rejects_unknown_fields() -> None:
                 "message": "The request could not be processed.",
                 "traceback": "must not leak",
             }
+        )
+
+
+def test_active_schedule_response_allows_an_empty_store() -> None:
+    assert ActiveScheduleResponse(schedule=None).model_dump() == {"schedule": None}
+
+
+def test_active_schedule_exposes_only_the_documented_fields() -> None:
+    schedule = ActiveSchedule(
+        filename="dienstplan.xlsx",
+        size_bytes=2048,
+        uploaded_at=datetime(2026, 9, 14, 8, 30, tzinfo=timezone.utc),
+        uploaded_by="chief",
+    )
+
+    assert schedule.model_dump(mode="json") == {
+        "filename": "dienstplan.xlsx",
+        "size_bytes": 2048,
+        "uploaded_at": "2026-09-14T08:30:00Z",
+        "uploaded_by": "chief",
+    }
+
+
+def test_active_schedule_rejects_a_stored_filename_leak() -> None:
+    with pytest.raises(ValidationError):
+        ActiveSchedule.model_validate(
+            {
+                "filename": "dienstplan.xlsx",
+                "size_bytes": 2048,
+                "uploaded_at": "2026-09-14T08:30:00Z",
+                "uploaded_by": "chief",
+                "stored_filename": "0123456789abcdef0123456789abcdef.xlsx",
+            }
+        )
+
+
+def test_active_schedule_rejects_a_negative_size() -> None:
+    with pytest.raises(ValidationError):
+        ActiveSchedule(
+            filename="dienstplan.xlsx",
+            size_bytes=-1,
+            uploaded_at=datetime(2026, 9, 14, 8, 30, tzinfo=timezone.utc),
+            uploaded_by="chief",
         )

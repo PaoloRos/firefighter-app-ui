@@ -1,6 +1,8 @@
 """API response models."""
 
 from firefighter_tools_backend.models.calendar_conversion import (
+    ActiveSchedule,
+    ActiveScheduleResponse,
     Calendar,
     ConversionResponse,
     ConversionStatus,
@@ -12,6 +14,8 @@ from firefighter_tools_backend.models.calendar_conversion import (
 )
 
 __all__ = [
+    "ActiveSchedule",
+    "ActiveScheduleResponse",
     "Calendar",
     "ConversionResponse",
     "ConversionStatus",

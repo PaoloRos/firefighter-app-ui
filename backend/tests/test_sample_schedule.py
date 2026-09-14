@@ -1,6 +1,6 @@
 """Verification for the version-controlled XLSX sample schedule."""
 
-from datetime import date, datetime, time
+from datetime import date, datetime
 from importlib.metadata import version
 from pathlib import Path
 
@@ -28,11 +28,7 @@ EXPECTED_COLUMNS = [
     "location",
     "description",
 ]
-EXPECTED_IDS = [
-    "uebung-2026-08-03",
-    "dienst-2026-08-08",
-    "uebung-2026-08-15",
-]
+EXPECTED_IDS = ["dienst-2026-08-08"]
 
 
 def test_sample_is_small_and_stored_in_application_assets() -> None:
@@ -54,18 +50,17 @@ def test_sample_uses_exact_v020_columns_and_native_cell_types() -> None:
         workbook.close()
 
     assert list(rows[0]) == EXPECTED_COLUMNS
-    assert len(rows) == 4
+    assert len(rows) == len(EXPECTED_IDS) + 1
     assert all(len(row) == len(EXPECTED_COLUMNS) for row in rows)
     assert [row[0] for row in rows[1:]] == EXPECTED_IDS
-    assert [row[2] for row in rows[1:]] == [False, True, False]
     assert all(isinstance(row[3], (date, datetime)) for row in rows[1:])
     assert all(isinstance(row[5], (date, datetime)) for row in rows[1:])
-    assert isinstance(rows[1][4], time)
-    assert rows[2][4] is None
-    assert isinstance(rows[3][4], time)
-    assert isinstance(rows[1][6], time)
-    assert rows[2][6] is None
-    assert isinstance(rows[3][6], time)
+
+    # The sample is a single all-day entry: the flag is set and both time
+    # cells are genuinely empty rather than a zero time.
+    assert [row[2] for row in rows[1:]] == [True]
+    assert [row[4] for row in rows[1:]] == [None]
+    assert [row[6] for row in rows[1:]] == [None]
 
 
 def test_sample_converts_all_events_with_calendar_conversion_v020() -> None:
@@ -78,12 +73,15 @@ def test_sample_converts_all_events_with_calendar_conversion_v020() -> None:
         result.total_count,
         result.converted_count,
         result.skipped_count,
-    ) == (3, 3, 0)
+    ) == (len(EXPECTED_IDS), len(EXPECTED_IDS), 0)
     assert result.invalid_events == ()
     for event_id in EXPECTED_IDS:
         assert f"UID:{event_id}" in result.ics_text
-    assert "SUMMARY:Atemschutzübung" in result.ics_text
-    assert "LOCATION:Übungsplatz" in result.ics_text
+    assert "SUMMARY:Bereitschaftsdienst" in result.ics_text
+    assert "LOCATION:Feuerwehrhaus" in result.ics_text
+    # An all-day entry must emit DATE values, never a midnight timestamp.
+    assert "DTSTART;VALUE=DATE:20260808" in result.ics_text
+    assert "DTEND;VALUE=DATE:20260809" in result.ics_text
 
 
 def test_sample_is_downloaded_from_one_stable_application_url(
@@ -129,6 +127,6 @@ def test_endpoint_accepts_the_sample_as_a_successful_upload(
         payload["total_count"],
         payload["converted_count"],
         payload["skipped_count"],
-    ) == (3, 3, 0)
+    ) == (len(EXPECTED_IDS), len(EXPECTED_IDS), 0)
     assert payload["invalid_events"] == []
     assert payload["calendar"]["filename"] == "calendar_schedule_example.ics"

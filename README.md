@@ -31,12 +31,18 @@ and every `*.db` file are git-ignored and must never be committed. The session
 cookie is signed with `FIREFIGHTER_TOOLS_SECRET_KEY`, which falls back to an
 insecure development-only value when unset.
 
+The uploaded schedule itself is stored in `data/schedules/` by default
+(override with `FIREFIGHTER_TOOLS_SCHEDULE_STORE`). That directory is covered
+by the same git-ignored `data/` rule and must never be committed.
+
 Two roles exist:
 
-- `super_user` — may upload schedules to the calendar converter, and may do
-  everything a `user` can.
-- `user` — may sign in, use read-only tool features, and download the example
-  schedule. Personalised calendar downloads are planned for a later version.
+- `super_user` — may upload a schedule to the server, replacing the single
+  active schedule every account converts, may download the example schedule
+  that shows the required columns, and may do everything a `user` can.
+- `user` — may sign in, see which schedule is loaded, start its conversion,
+  and download the resulting calendar. The example XLSX is not offered,
+  because a plain account never supplies a source file.
 
 All account management happens through the `firefighter_tools_backend` module.
 Run the commands from the repository root after `make setup`; the database file
@@ -122,7 +128,7 @@ Run the complete backend, frontend, production-integration, browser end-to-end, 
 make test
 ```
 
-The command builds the production frontend where required, starts and stops the end-to-end server automatically, verifies `calendar-conversion v0.2.0`, checks Python dependencies, confirms the loopback binding, and rejects retained `.ics` files.
+The command builds the production frontend where required, starts and stops the end-to-end server automatically, verifies `calendar-conversion v0.2.0`, checks Python dependencies, confirms the loopback binding, rejects retained `.ics` files, and checks that the schedule store stays under `data/` and holds only opaque `<uuid>.<csv|xlsx>` files.
 
 Individual suites are also available:
 
@@ -134,7 +140,7 @@ make test-e2e
 make verify
 ```
 
-Playwright downloads are written to its ignored temporary test-output directory. The application does not write uploaded schedules or generated calendars to the repository.
+Playwright downloads are written to its ignored temporary test-output directory. The application writes no generated calendar to disk; the only file it retains is the active schedule inside the git-ignored store.
 
 ## Local production run
 
@@ -150,13 +156,21 @@ After `make setup` has installed dependencies and the Playwright browser, `make 
 
 ## Calendar-converter workflow
 
-1. Open the calendar converter from the dashboard.
-2. Select or drop a CSV/XLSX schedule up to 10 MiB, or download the example XLSX schedule.
-3. Start conversion and review converted and skipped-event counts.
-4. For a complete or partial result, download the generated ICS calendar. Partial calendars contain only valid events. All-invalid schedules show their problems without offering an empty download.
-5. Switch between German and Italian at any time; an explicit choice is retained locally.
+As a `super_user`:
 
-Uploads and generated calendars are processed in memory and are not retained by the application.
+1. Open the calendar converter from the dashboard.
+2. Select or drop a CSV/XLSX schedule up to 10 MiB, or download the example XLSX schedule. Uploading replaces the active schedule for every account.
+3. Start conversion and review converted and skipped-event counts, including each skipped event and its problems.
+4. For a complete or partial result, download the generated ICS calendar. Partial calendars contain only valid events. All-invalid schedules show their problems without offering an empty download.
+
+As a `user`:
+
+1. Open the calendar converter and confirm which schedule is currently loaded.
+2. Start the conversion and download the generated ICS calendar. Uploading, the example XLSX download, and the skipped-event diagnostics are reserved for `super_user` accounts.
+
+In both cases, switch between German and Italian at any time; an explicit choice is retained locally.
+
+The active schedule is stored on the server until a `super_user` replaces it. Generated calendars are produced in memory per request and are never written to disk.
 
 ## Troubleshooting
 
@@ -167,6 +181,8 @@ Uploads and generated calendars are processed in memory and are not retained by 
 - If port `5173` or `8000` is already in use, stop the existing local process before restarting. Development uses both ports; production uses only `8000`.
 - If the development proxy fails, confirm that FastAPI is running on `127.0.0.1:8000` and that `FIREFIGHTER_TOOLS_API_TARGET` contains only a loopback HTTP URL.
 - If an end-to-end test fails, inspect `frontend/test-results/` or run `cd frontend && ./node_modules/.bin/playwright show-report`; these ignored diagnostic artifacts can be removed after review.
+- If the converter reports that no schedule is available, sign in as a `super_user` and upload one; the store starts empty on a fresh checkout.
+- To reset the server-held schedule, stop the application and delete `data/schedules/`. The next read detects the missing file, clears the stale record, and reports an empty store.
 - If setup fails while offline, reconnect for the initial dependency/browser installation. Normal `make run` operation is offline after setup completes.
 
 ## Credits

@@ -3,8 +3,9 @@ import { existsSync } from "node:fs";
 import { readdir } from "node:fs/promises";
 import path from "node:path";
 
+import { E2E_SCHEDULE_STORE } from "./database";
 import { E2E_SUPER_USER } from "./credentials";
-import { signIn } from "./helpers";
+import { signIn, storeSchedule } from "./helpers";
 
 const repositoryRoot = path.resolve(import.meta.dirname, "../..");
 const fixtures = path.resolve(import.meta.dirname, "fixtures");
@@ -27,7 +28,15 @@ test("converts the example XLSX and persists an explicit Italian choice", async 
   await page.getByRole("button", { name: "Italiano" }).click();
   await page.getByRole("link", { name: "Apri lo strumento" }).click();
   await page.getByLabel("Scegli un file").setInputFiles(exampleSchedule);
-  await page.getByRole("button", { name: "Avvia la conversione" }).click();
+  await page
+    .getByRole("button", { name: "Carica il piano dei turni" })
+    .click();
+  await expect(
+    page
+      .getByRole("region", { name: "Piano dei turni attuale" })
+      .getByText("calendar_schedule_example.xlsx"),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Crea il calendario" }).click();
 
   await expect(
     page.getByRole("heading", { name: "Conversione completata" }),
@@ -41,7 +50,7 @@ test("converts the example XLSX and persists an explicit Italian choice", async 
   expect(download.suggestedFilename()).toBe("calendar_schedule_example.ics");
   const calendar = (await readDownload(download)).toString("utf-8");
   expect(calendar).toContain("BEGIN:VCALENDAR");
-  expect(calendar).toContain("UID:uebung-2026-08-03");
+  expect(calendar).toContain("UID:dienst-2026-08-08");
 
   await page.reload();
   await expect(
@@ -51,10 +60,8 @@ test("converts the example XLSX and persists an explicit Italian choice", async 
 
 test("downloads only valid events from a partial conversion", async ({ page }) => {
   await openConverter(page);
-  await page
-    .getByLabel("Datei auswählen")
-    .setInputFiles(path.join(fixtures, "partial.csv"));
-  await page.getByRole("button", { name: "Konvertierung starten" }).click();
+  await storeSchedule(page, path.join(fixtures, "partial.csv"));
+  await page.getByRole("button", { name: "Kalender erstellen" }).click();
 
   await expect(
     page.getByRole("heading", { name: "Teilweise konvertiert" }),
@@ -73,10 +80,8 @@ test("downloads only valid events from a partial conversion", async ({ page }) =
 
 test("shows an all-invalid result without a calendar download", async ({ page }) => {
   await openConverter(page);
-  await page
-    .getByLabel("Datei auswählen")
-    .setInputFiles(path.join(fixtures, "all-invalid.csv"));
-  await page.getByRole("button", { name: "Konvertierung starten" }).click();
+  await storeSchedule(page, path.join(fixtures, "all-invalid.csv"));
+  await page.getByRole("button", { name: "Kalender erstellen" }).click();
 
   await expect(
     page.getByRole("heading", { name: "Keine Ereignisse konvertiert" }),
@@ -89,10 +94,8 @@ test("shows an all-invalid result without a calendar download", async ({ page })
 
 test("renders a safe translated error for malformed input", async ({ page }) => {
   await openConverter(page);
-  await page
-    .getByLabel("Datei auswählen")
-    .setInputFiles(path.join(fixtures, "malformed.csv"));
-  await page.getByRole("button", { name: "Konvertierung starten" }).click();
+  await storeSchedule(page, path.join(fixtures, "malformed.csv"));
+  await page.getByRole("button", { name: "Kalender erstellen" }).click();
 
   const alert = page.getByRole("alert");
   await expect(
@@ -136,6 +139,16 @@ test.afterAll(async () => {
   expect(await findGeneratedCalendars(repositoryRoot)).toEqual([]);
   expect(existsSync(path.join(repositoryRoot, "uploads"))).toBe(false);
   expect(existsSync(path.join(repositoryRoot, "generated"))).toBe(false);
+  expect(existsSync(path.join(repositoryRoot, "schedules"))).toBe(false);
+
+  // The store keeps the source schedule, but never a generated calendar.
+  const stored = existsSync(E2E_SCHEDULE_STORE)
+    ? await readdir(E2E_SCHEDULE_STORE)
+    : [];
+  expect(stored.filter((name) => name.endsWith(".ics"))).toEqual([]);
+  for (const name of stored) {
+    expect(name).toMatch(/^[0-9a-f]{32}\.(csv|xlsx)$/);
+  }
 });
 
 async function openConverter(page: import("@playwright/test").Page) {

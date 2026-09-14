@@ -1079,3 +1079,81 @@ Use the following abbreviations:
 4. Sign out and sign in as `leiter`; confirm the rank tag reads `GKDT-STV` in amber. Sign in as `fwm`; confirm `FWM` is a neutral tag with no Zug or Gruppe tag.
 5. Switch `Deutsch` ↔ `Italiano` and confirm the heading (`Wer bist du` / `Chi sei`) and the `Angemeldet als` / `Connesso come` label translate, while the `Zug` and `Gruppe` prefixes and the rank abbreviations stay unchanged.
 6. Resize the browser to about 320 px and confirm the tags wrap with no horizontal scrolling.
+
+### TASK-040 - Store one active schedule on the server
+
+**Ask:** Let a super-user upload a source schedule to the server so it becomes the single active schedule, and let every signed-in account start the conversion of that stored schedule and get the calendar back. Add the storage, endpoints, and tests for this, and update PLAN.md.
+
+**Answer:** Added a server-held active schedule: `PUT /api/v1/tools/calendar-converter/schedule` stores one `super_user` upload as the single active schedule, `GET .../schedule` reports its metadata to any signed-in account (returning `{"schedule": null}` for an empty store rather than an error), and `POST .../schedule/convert` converts it for any signed-in account, returning `409` with the new stable `no_active_schedule` code when nothing is stored. The upload reuses `validate_upload` unchanged, so the extension allow-list, the 10 MiB ceiling, and filename sanitization are identical to the existing endpoint, and conversion reuses `convert_calendar` and `_conversion_response`, so the response contract is byte-identical to `POST .../convert`, which is retained unchanged as a stateless API. Files live in `data/schedules/` (overridable with `FIREFIGHTER_TOOLS_SCHEDULE_STORE`) under opaque `<uuid4hex>.<csv|xlsx>` names, so the uploaded filename never reaches the filesystem and traversal is structurally impossible; the sanitized original is kept only in the new singleton `active_schedule` table and still names the downloaded `.ics`. The row is the source of truth: writes are `fsync`ed to a temporary file and atomically renamed, the row is committed, and only then is every unreferenced file purged, so a crash leaves at most an orphan the next upload removes; a row whose file has disappeared is deleted on read, so the read and convert endpoints can never disagree. Stored timestamps are re-attached to UTC because SQLite drops the offset, which otherwise made the same schedule serialize differently on write and on read-back. `scripts/verify.py` gained four invariants covering the store, which the pre-existing `.ics` sweep could not see because it skips `data/`. Verified 144 backend tests (up from 99), `make test` end to end (backend 144, frontend 93 unchanged, integration 10, Playwright e2e 10, verify), a clean `git diff --check`, and a manual two-account HTTP walk-through against a scratch database.
+
+**Automated test:**
+
+1. From the repository root, run `make test-backend` and confirm that 144 tests pass, including the 12 in `backend/tests/test_schedule_store_service.py` and the 27 in `backend/tests/test_active_schedule_endpoint.py`.
+2. Run `make verify` and confirm it prints `schedule store: data/schedules (N files)` alongside the existing invariants and exits zero.
+3. Run `make test` and confirm the backend (144), frontend (93), integration (10), Playwright e2e (10), and verify stages all pass.
+4. Run `git diff --check` and confirm that it produces no output.
+
+**Developer demo:**
+
+1. From the repository root, point at a scratch database and store, then create one account of each role, entering a password twice at each prompt:
+   ```
+   export FIREFIGHTER_TOOLS_DATABASE_URL="sqlite:///$(pwd)/data/demo.db"
+   export FIREFIGHTER_TOOLS_SCHEDULE_STORE="$(pwd)/data/demo-schedules"
+   backend/.venv/bin/python -m firefighter_tools_backend create-user --username chief --role super_user --name Anna
+   backend/.venv/bin/python -m firefighter_tools_backend create-user --username member --role user
+   ```
+2. Start the server with `backend/.venv/bin/python -m firefighter_tools_backend`, then sign in as the super-user: `curl -s -c /tmp/chief.jar -X POST 127.0.0.1:8000/api/v1/auth/login -H 'content-type: application/json' -d '{"username":"chief","password":"<password>"}'` returns `200`.
+3. Run `curl -s -b /tmp/chief.jar 127.0.0.1:8000/api/v1/tools/calendar-converter/schedule` and confirm it prints `{"schedule":null}`.
+4. Upload the example schedule with `curl -s -b /tmp/chief.jar -X PUT -F "file=@assets/examples/calendar_schedule_example.xlsx" 127.0.0.1:8000/api/v1/tools/calendar-converter/schedule` and confirm the response names `calendar_schedule_example.xlsx`, its size, and `"uploaded_by":"chief"`.
+5. Sign in as the plain user into a second cookie jar, then confirm `GET .../schedule` shows the same schedule and `curl -s -b /tmp/member.jar -X POST 127.0.0.1:8000/api/v1/tools/calendar-converter/schedule/convert` returns `"status":"success"` with `"converted_count":3` and a `calendar_schedule_example.ics` payload.
+6. Confirm the same plain-user cookie is refused for uploads: the `PUT` returns `403` with `{"code":"forbidden"}`.
+7. Run `ls data/demo-schedules` and confirm exactly one opaque `<uuid>.xlsx` file, and `find data/demo-schedules -name '*.ics'` and confirm no calendar was written.
+8. Stop the server and remove the scratch state: `rm -rf data/demo.db data/demo-schedules` and unset both environment variables.
+
+### TASK-041 - Split the converter interface by role
+
+**Ask:** Rework the calendar-converter page so a super-user sees the stored schedule, the upload control, and the full skipped-event diagnostics, while a plain user sees only which schedule is loaded, a convert button, the counts, and the download button. Cover both experiences with component and end-to-end tests.
+
+**Answer:** Rebuilt the calendar-converter page around the server-held schedule from `TASK-040`. `CalendarConverterPage` is now orchestration only, holding two independent state machines (schedule: `loading`/`empty`/`loaded`/`unavailable`, conversion: `idle`/`converting`/`result`/`fatal`) and delegating to three new components: `ActiveScheduleCard` shows the loaded filename, uploader, timestamp and size to every account, `ScheduleUploadForm` owns the drag-and-drop upload behind `RequireSuperUser`, and `ConversionResultPanel` takes a `variant` prop — `full` renders the skipped count and every skipped event with its problems, `download` renders only the total and converted counts plus the download button. Extracting the result panel also fixed a latent defect: it had been redefined inside the page's render function, so React remounted the entire result subtree on every state change. The API client gained `fetchActiveSchedule`, `uploadActiveSchedule` (PUT) and `convertActiveSchedule` with runtime contract guards, and `no_active_schedule` was added to both the `ApiErrorCode` union and the `apiErrorCodes` set so a `409` surfaces as a typed error rather than a thrown contract error; when it arrives the page also resets the card to empty, mirroring the server's self-heal. Added 19 translation keys to both dictionaries, rewrote the now-false `calendarHelpPrivacy` sentence, and removed the obsolete `converterUploadRestricted*` pair together with its spot-check in `translations.test.ts`. The help aside drops the upload step and the format/size limits for a plain user. End-to-end, `playwright.config.ts` is pinned to a single worker: the active schedule is process-global state, and parallel spec files were replacing each other's schedule mid-test. Verified 107 frontend tests (up from 93) across 15 files, 12 Playwright tests (up from 10), a strict `tsc -b`, `make test` end to end (backend 144, frontend 107, integration 10, e2e 12, verify), a clean `git diff --check`, and a manual check that `make run` serves the app and leaves the new endpoint gated.
+
+**Automated test:**
+
+1. From `frontend/`, run `./node_modules/.bin/tsc -b` and confirm it completes with no output. A missing Italian translation key or an unmapped API error code fails here.
+2. From the repository root, run `make test-frontend` and confirm 107 tests pass across 15 files, including the new `ActiveScheduleCard`, `ConversionResultPanel`, and `ScheduleUploadForm` suites.
+3. Run `make test-e2e` and confirm 12 tests pass, including `e2e/active-schedule.spec.ts`.
+4. Run `make test` and confirm the backend (144), frontend (107), integration (10), Playwright e2e (12), and verify stages all pass.
+5. Run `git diff --check` and confirm that it produces no output.
+
+**Developer demo:**
+
+1. Create one account of each role if none exist, then start the application from the repository root with `make run` and open `http://127.0.0.1:8000`.
+2. Sign in as the `super_user`. Open the calendar converter and confirm the card reads `Es ist noch kein Dienstplan auf dem Server hinterlegt.` and the `Kalender erstellen` button is disabled.
+3. Choose or drop `assets/examples/calendar_schedule_example.xlsx`, press `Dienstplan hochladen`, and confirm the card now shows the filename, `Hochgeladen von`, the timestamp, and the size, and that the notice explains the upload replaces the schedule for all accounts.
+4. Press `Kalender erstellen` and confirm the outcome heading receives focus, the three counts appear, the skipped-event list is shown, and `Kalender herunterladen` saves a `.ics`.
+5. Sign out, sign in as the plain `user`, and open the calendar converter. Confirm the same schedule card is visible, there is no file input and no `Dienstplan hochladen` button, and the help aside lists two steps instead of three.
+6. Press `Kalender erstellen` as the plain user and confirm the result shows only the total and converted counts with a working download, and no skipped count or `Probleme im Dienstplan` section.
+7. Switch `Deutsch` ↔ `Italiano` and confirm the schedule card labels, the convert button, and the upload panel translate.
+8. Resize the browser to about 320 px and confirm the schedule card, actions, and result panel wrap with no horizontal scrolling.
+
+### TASK-042 - Hide the example schedule download from plain users
+
+**Ask:** For the users, remove the download of the example plan. Since they has just to download the ICS file, it isn't required the XLSX file
+
+**Answer:** Gated the example XLSX download link in the converter help aside behind the same `isSuperUser` check that already trims the help steps, so it renders only for accounts that can upload. A plain `user` now sees a help aside with the two steps it can perform and no source-file affordance at all, which matches the rest of its experience: no file input, no upload button, and no skipped-event diagnostics. The backend `GET /api/v1/tools/calendar-converter/example` endpoint is deliberately left open to any signed-in account — it serves a static, non-sensitive template and nothing in the interface points a plain user at it — so no route, dependency, or backend test changed. Updated `PLAN.md` and `README.md`, whose role descriptions had promised the example download to every signed-in account.
+
+This task also absorbed an unrelated change the project owner made to `assets/examples/calendar_schedule_example.xlsx`, which was reduced from three events to a single all-day `dienst-2026-08-08` entry. Five tests pinned the previous contents and were re-pointed at the new sample: three in `test_sample_schedule.py`, the XLSX success case in `test_calendar_converter_endpoint.py`, and the ICS assertion in `e2e/calendar-converter.spec.ts`. The structural test now derives its row count from `EXPECTED_IDS` and asserts the all-day shape (flag set, both time cells empty), and the conversion test additionally asserts that an all-day entry emits `DTSTART;VALUE=DATE` rather than a midnight timestamp. Note that the sample no longer exercises native XLSX `time` cells; timed events remain covered by the CSV cases. Also added `~$*` to `.gitignore` so Excel lock files cannot be committed. Verified 108 frontend tests (up from 107), `make test` end to end (backend 144, frontend 108, integration 10, Playwright e2e 12, verify) and a clean `git diff --check`.
+
+**Automated test:**
+
+1. From the repository root, run `make test-frontend` and confirm 108 tests pass, including `hides the example schedule from a plain user` and `offers the example schedule to a super-user who uploads`.
+2. Run `make test-backend` and confirm 144 tests pass, including the re-pointed `backend/tests/test_sample_schedule.py`.
+3. Run `make test-e2e` and confirm 12 tests pass, including `hides every upload affordance from a plain user`.
+4. Run `make test` and confirm the backend (144), frontend (108), integration (10), Playwright e2e (12), and verify stages all pass.
+5. Run `git diff --check` and confirm that it produces no output.
+
+**Developer demo:**
+
+1. Start the application from the repository root with `make run` and open `http://127.0.0.1:8000`.
+2. Sign in as a `super_user`, open the calendar converter, and confirm the help aside still ends with the `XLSX-Beispieldienstplan herunterladen` link and that clicking it downloads `calendar_schedule_example.xlsx`.
+3. Sign out, sign in as a plain `user`, and open the calendar converter. Confirm the help aside lists only the convert and download steps and shows no example-download link.
+4. Confirm the plain user can still press `Kalender erstellen` and download the generated ICS, so nothing it needs was removed.

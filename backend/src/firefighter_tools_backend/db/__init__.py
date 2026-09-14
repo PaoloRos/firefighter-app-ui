@@ -5,7 +5,12 @@ from firefighter_tools_backend.db.engine import (
     create_session,
     engine,
 )
-from firefighter_tools_backend.db.models import Base, UserRecord
+from firefighter_tools_backend.db.models import (
+    SINGLETON_SCHEDULE_ID,
+    ActiveScheduleRecord,
+    Base,
+    UserRecord,
+)
 
 
 def init_db() -> None:
@@ -14,6 +19,8 @@ def init_db() -> None:
 
 
 __all__ = [
+    "SINGLETON_SCHEDULE_ID",
+    "ActiveScheduleRecord",
     "Base",
     "SessionLocal",
     "UserRecord",

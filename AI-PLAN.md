@@ -1,485 +1,506 @@
-# "Who are you" identity panel on the home page
+# Server-held active schedule with a role-split converter
 
 ## Context
 
-`TODO.md` now holds a free-form feature note (the queue template was overwritten): after
-login the user wants the **home/dashboard page** to show who is signed in — the username,
-the full name in capitals, and `rank` / `zug` / `gruppe` as circled soft-background tags,
-with the rank tag colour-coded by seniority.
+[TODO.md](TODO.md) holds a free-form brief, not a `TASK-0NN` entry:
 
-Today the app already authenticates and exposes every field this needs, but nothing renders
-`surname`, `rank`, `zug`, or `gruppe` anywhere — the header `UserMenu` only shows
-`name` (or `username`) plus a role badge. This task adds a read-only profile panel to the
-dashboard. It is **frontend-only**: `GET /api/v1/auth/me` already returns
-`username, role, name, surname, rank, zug, gruppe` (`backend/.../models/auth.py` `SessionUser`),
-and `useAuth().user` already carries all of them (`frontend/src/api/auth.ts` `SessionUser`).
+> a `super-user` can upload source files to the server, and then start the conversion for him-self.
+> While `user` can only start the conversion. […] Change also the interface for `user`. Must be
+> shown only what regards the downloading process.
+
+Today the converter is **stateless**. [routes/calendar_converter.py](backend/src/firefighter_tools_backend/routes/calendar_converter.py)
+exposes `POST /convert` (multipart, `Depends(require_super_user)`) which converts in memory and
+returns ICS text as JSON, and `GET /example` (`Depends(get_current_user)`) which serves the
+version-controlled sample. Nothing is written to disk. A plain `user` therefore has **no usable
+tool** — [CalendarConverterPage.tsx:176-183](frontend/src/pages/CalendarConverterPage.tsx#L176-L183)
+wraps the upload form in `<RequireSuperUser fallback={…}>` and shows a "Upload ist eingeschränkt"
+note instead.
+
+The brief makes the server hold state: a stored source schedule that a plain `user` converts
+without ever uploading. That gives plain users a real feature for the first time.
+
+**This contradicts the documented no-retention posture in five places**, all of which must be
+updated as part of the work:
+
+| Where | Exact wording today |
+|---|---|
+| [PLAN.md:14](PLAN.md#L14) | "Retain neither uploads nor generated calendars after the request." |
+| [PLAN.md:91](PLAN.md#L91) | "Do not persist or log uploaded content." |
+| [PLAN.md:174](PLAN.md#L174) | "…no analytics, background jobs, or server-side history of uploaded or generated files." |
+| [AGENTS.md:60](AGENTS.md#L60) | "…bind locally to `127.0.0.1`, and retain no uploaded files." |
+| [README.md](README.md) L125/L137/L159 | "The application does not write uploaded schedules or generated calendars to the repository." |
+
+And [scripts/verify.py](scripts/verify.py) enforces it mechanically: it fails if a repo-root
+`uploads/` or `generated/` directory **exists at all**, and if any `.ics` survives outside
+`IGNORED_DIRECTORIES = {".git", ".venv", "data", "dist", "node_modules", "playwright-report", "test-results"}`.
+`data/` being on that skip list makes it the only pre-blessed writable location — and also means a
+store placed there is currently **invisible** to the verifier, a hole this work must close.
 
 ## Decisions (confirmed with the user)
 
-1. **Placement** — a panel on the existing home page (`DashboardPage`, route `/`), inserted
-   between the `.hero` intro and the tools grid. No new route.
-2. **Rank storage** — ranks are stored as the **abbreviations themselves** (`KDT`, `ZKDT`,
-   `GKDT`, `FWM`, `KDT-STV`, `GKDT-STV`, …) via `create-user --rank`. A recognised rank is
-   displayed in its canonical abbreviation (with a hyphenated `...-STV` for deputies); the
-   panel does **not** map full German names → abbreviations. Unknown values render as a
-   neutral tag showing the raw text upper-cased.
-3. **Deputy colour rule** — a deputy inherits its base rank's colour.
-4. **Zug / Gruppe tags** — labelled, e.g. `Zug 1`, `Gruppe 2` (translated prefix + value).
+| Question | Decision |
+|---|---|
+| What does the server hold? | **One current/active schedule**, not a library. A super-user uploads to replace it; everyone converts that one. This matches the brief's future note ("depending on the user, are converted just specific commitments" — one shared roster, filtered per person later). |
+| Does `POST /convert` survive? | **Yes, unchanged**, alongside the new endpoints. Keeps ad-hoc stateless conversion and avoids churning the 99 backend tests. |
+| What does a plain `user` see? | Which schedule is loaded, a convert button, **total/converted counts**, and the download button. **No** upload control, **no** skipped-event diagnostics. |
+| How is it queued? | **Two tasks: `TASK-040` (backend + docs), `TASK-041` (frontend + e2e).** Highest recorded id is `TASK-039`. |
 
-### Rank → colour + canonical label
-
-The stored value is matched **tolerantly** — upper-cased, a spelled-out `STELLVERTRETER`
-expanded to `STV`, then every non-alphanumeric char stripped — so `"KDT-STV"`, `"kdt stv"`,
-`"Kdt–Stv"`, and `"KDT-Stellvertreter"` all resolve to the same rank. A matched rank is then
-**always displayed in its canonical abbreviation**, and a deputy is **always shown with the
-`...-STV` suffix** (never a run-together `KDTSTV`).
-
-| Canonical label (displayed) | Colour  | Token trio used |
-|-----------------------------|---------|-----------------|
-| `KDT`, `KDT-STV`            | red     | `--color-danger` / `-border` / `-surface` |
-| `ZKDT`, `ZKDT-STV`, `GKDT`, `GKDT-STV` | yellow | `--color-warning` / `-border` / `-surface` |
-| `FWM`                      | neutral | `--color-canvas-accent` + `--color-border-strong` + `--color-text` (the existing pill look) |
-| any unrecognised value     | neutral | same neutral pill; label = the raw trimmed value upper-cased, except a value ending in `STV` is rendered `<BASE>-STV` |
-
-`ZKDT-STV` is not in the user's written list but follows from the confirmed deputy rule.
+Judgement call inside decision 3: a plain user does not see the **skipped count** either — showing a
+number they cannot act on invites questions they cannot answer. They still get the partial/failure
+guidance sentence, so a short calendar is never silent. This is one `variant` prop, trivially
+flipped if it reads wrong in the demo.
 
 ## Scope / non-goals
 
-- No backend, DB, CLI, or API-contract change.
-- No change to the header `UserMenu` (the small header identity and the fuller home panel
-  intentionally overlap).
-- No rank validation added to `create-user` (out of scope; free-form stays free-form).
-- Capitalisation of the name is done with CSS `text-transform`, not by transforming the
-  string — screen readers and copy/paste keep the real casing.
-- Colour is never the only signal: the rank abbreviation text differs (`KDT` vs `FWM`) and a
-  visually-hidden "Dienstgrad:" label precedes it.
+- No `DELETE /schedule` endpoint. Replacement is the only super-user mutation the brief describes.
+- No per-user filtering of commitments — that is the brief's explicitly future item.
+- No Alembic. `init_db()` is `Base.metadata.create_all(engine)`, which is per-table idempotent, so
+  an existing `data/firefighter.db` gains an empty table on next start.
+- No history or versioning: exactly one active schedule, no previous versions retained.
+- No change to `POST /convert`, `GET /example`, auth, or the CLI.
+- Generated calendars stay **fully in memory**. No `.ics` is ever written to disk.
 
 ## Implementation
 
-### 1. Queue the task as `TASK-039`
+### TASK-040 — backend
 
-Restore the `TODO.md` queue structure (header + `## TASK-039: Add the "Who are you" home
-identity panel` + `**Ask:**` set to the user's current note **verbatim**). Highest recorded
-id is `TASK-038` in `IMPLEMENTATION.md`, so this is `TASK-039`. Use the `/todo-task` skill
-for the queue/history bookkeeping.
+**1. Settings** — [config.py](backend/src/firefighter_tools_backend/config.py)
 
-### 2. Rank presentation helper — `frontend/src/components/rankPresentation.ts` (new)
+```python
+_DEFAULT_SCHEDULE_STORE_PATH = _REPOSITORY_ROOT / "data" / "schedules"
+SCHEDULE_STORE_ENV_VAR = "FIREFIGHTER_TOOLS_SCHEDULE_STORE"
+```
 
-Pure, dependency-free, mirrors the existing stable-code pattern
-(`translateApiErrorCode` in `frontend/src/i18n/translations.ts`).
+Add `schedule_store_dir: Path` to `Settings` **immediately after `secret_key`** — dataclass ordering
+requires non-defaulted fields before `session_cookie_name`/`session_max_age`, which have defaults.
+`load_settings()` resolves the env var with `Path(raw).expanduser().resolve()`, else the default.
+
+`settings = load_settings()` is evaluated **once at import** (config.py:42), so the store service
+must read the path through a `store_directory()` function, never capture it at import — that is what
+makes `monkeypatch` work per test.
+
+**2. Table** — [db/models.py](backend/src/firefighter_tools_backend/db/models.py), re-export from [db/__init__.py](backend/src/firefighter_tools_backend/db/__init__.py)
+
+```python
+SINGLETON_SCHEDULE_ID = 1
+
+class ActiveScheduleRecord(Base):
+    __tablename__ = "active_schedule"
+    __table_args__ = (CheckConstraint("id = 1", name="ck_active_schedule_singleton"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)          # always 1
+    stored_filename: Mapped[str] = mapped_column(String(80))    # "<uuid4hex>.xlsx"
+    original_filename: Mapped[str] = mapped_column(String(255))
+    size_bytes: Mapped[int] = mapped_column(Integer)
+    uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    uploaded_by_user_id: Mapped[int | None] = mapped_column(Integer, default=None)
+    uploaded_by_username: Mapped[str] = mapped_column(String(150))
+```
+
+**No ForeignKey to `users.id`** — deliberate. [conftest.py](backend/tests/conftest.py) authenticates
+by overriding `get_current_user` with a `User` dataclass, so `SUPER_USER` has **no row in `users`**.
+An FK is inert today (SQLite needs `PRAGMA foreign_keys=ON`, which [db/engine.py](backend/src/firefighter_tools_backend/db/engine.py)
+never sets) but would detonate every endpoint test the day anyone enables it. The denormalized
+`uploaded_by_username` is what the UI renders anyway, and it survives account deletion.
+
+**3. Domain** — `backend/src/firefighter_tools_backend/domain/schedule_store.py` (new), mirroring
+[domain/upload.py](backend/src/firefighter_tools_backend/domain/upload.py):
+
+```python
+class ScheduleStoreErrorCode(StrEnum):
+    NO_ACTIVE_SCHEDULE = "no_active_schedule"
+    STORE_WRITE_ERROR = "store_write_error"
+
+class ScheduleStoreError(Exception): ...          # .code, like UploadValidationError
+
+@dataclass(frozen=True, slots=True)
+class StoredSchedule:
+    original_filename: str
+    path: Path
+    size_bytes: int
+    uploaded_at: datetime
+    uploaded_by: str
+```
+
+Named `StoredSchedule` to avoid colliding with the Pydantic `ActiveSchedule`.
+
+**4. Store service** — `backend/src/firefighter_tools_backend/services/schedule_store.py` (new)
+
+```python
+def store_directory() -> Path
+def save_active_schedule(session, upload: ValidatedUpload, *, uploaded_by: User) -> StoredSchedule
+def find_active_schedule(session) -> StoredSchedule | None      # GET; self-heals
+def load_active_schedule(session) -> StoredSchedule             # raises ScheduleStoreError
+def open_active_schedule(schedule: StoredSchedule) -> BinaryIO
+```
+
+*File on disk, metadata row in SQLite* — not a BLOB. `convert_calendar(source: BinaryIO, …)` in
+[services/calendar_conversion.py](backend/src/firefighter_tools_backend/services/calendar_conversion.py)
+takes any binary stream, so `path.open("rb")` drops in unchanged and the library keeps real `seek`;
+and `data/firefighter.db` stays an auth store a developer can `.dump`.
+
+On-disk name is `f"{uuid4().hex}{suffix}"` with the lowercased suffix from the already-sanitized
+filename. **The user-supplied name never reaches the filesystem** — traversal is structurally
+impossible and duplicate names are harmless. The sanitized original lives only in the DB and is
+passed to `_conversion_response(result, source_filename=…)`, so `Dienstplan 2026.xlsx` still
+downloads as `Dienstplan 2026.ics` with zero change to that helper.
+
+`save_active_schedule` ordering, which is what makes crashes harmless:
+
+1. `mkdir(parents=True, exist_ok=True)` — **lazily on first write, never at import**.
+2. Write to `NamedTemporaryFile(dir=directory, suffix=".tmp", delete=False)`, `flush()`, `os.fsync()`,
+   close, then `os.replace(tmp, target)` — atomic within one filesystem; a reader never sees a
+   partial file.
+3. Upsert the singleton row, `session.commit()`.
+4. **After** the commit, purge every file the row does not name (previous file, stale `.tmp`, orphans).
+5. On commit failure: `rollback()`, unlink the new file, raise `ScheduleStoreError(STORE_WRITE_ERROR)`.
+
+Contract: **the DB row is the source of truth; anything on disk it does not name is garbage.** The
+store never holds more than two files, so the purge is one `iterdir()`. The inverse failure (row
+present, file deleted by an operator) is handled on read — `find_active_schedule`/`load_active_schedule`
+check `path.is_file()` and, if missing, **delete the row, commit, and report absence**, so `GET` and
+`POST …/convert` can never disagree.
+
+**5. Contract models** — [models/calendar_conversion.py](backend/src/firefighter_tools_backend/models/calendar_conversion.py)
+
+```python
+class ActiveSchedule(ContractModel):
+    filename: str = Field(min_length=1)     # sanitized ORIGINAL name, never the uuid
+    size_bytes: int = Field(ge=0)
+    uploaded_at: datetime
+    uploaded_by: str = Field(min_length=1)
+
+class ActiveScheduleResponse(ContractModel):
+    schedule: ActiveSchedule | None
+```
+
+`FatalErrorCode` gains `NO_ACTIVE_SCHEDULE = "no_active_schedule"`. `ContractModel` is
+`extra="forbid"`, so `stored_filename` cannot leak by accident.
+
+**6. Endpoints** — added to the existing router in [routes/calendar_converter.py](backend/src/firefighter_tools_backend/routes/calendar_converter.py)
+(`prefix="/tools/calendar-converter"`, mounted at `/api/v1`). `POST /convert` and `GET /example` are
+**not touched**.
+
+| Endpoint | Auth | Success | Errors |
+|---|---|---|---|
+| `PUT /schedule` | `require_super_user` | 200 `ActiveScheduleResponse` | 401/403, 413/415/422 via `_UPLOAD_ERRORS`, 500 |
+| `GET /schedule` | `get_current_user` | **always 200**, `schedule: null` when empty | 401 |
+| `POST /schedule/convert` | `get_current_user` | 200 `ConversionResponse` | 401, **409 `no_active_schedule`**, 415/422, 500 |
+
+- `PUT` because it replaces the one addressable resource and is idempotent in effect. 200 not 201:
+  the endpoint always exists, and one response model for `PUT`+`GET` means one frontend guard.
+- `GET` returning 200-with-null is deliberate: "nothing uploaded yet" is a normal UI state, not an
+  error, and 404 would force a normal state through the client's error path.
+- Upload reuses `await validate_upload(file)` verbatim — extension allow-list, the 10 MiB ceiling,
+  filename sanitization, guaranteed close. **No conversion happens on upload.**
+- Convert reuses `convert_calendar` and `_conversion_response` unchanged, so success/partial/failure,
+  the count invariants and the `Calendar` payload are bit-identical to `/convert` and the frontend's
+  existing `isConversionResponse` guard works as-is.
+
+New third mapping dict alongside `_UPLOAD_ERRORS` / `_CONVERSION_ERRORS`:
+
+```python
+_STORE_ERRORS = {
+    ScheduleStoreErrorCode.NO_ACTIVE_SCHEDULE: (409, FatalErrorCode.NO_ACTIVE_SCHEDULE,
+                                                "No schedule has been uploaded yet."),
+    ScheduleStoreErrorCode.STORE_WRITE_ERROR:  (500, FatalErrorCode.INTERNAL_ERROR,
+                                                "The request could not be processed."),
+}
+```
+
+**7. `scripts/verify.py` — new invariants.** The existing `.ics` sweep skips `data/`, so the store
+would be invisible to it. Close the hole:
+
+1. When `SCHEDULE_STORE_ENV_VAR` is unset, assert `settings.schedule_store_dir.is_relative_to(ROOT / "data")`
+   (conditional, so a deliberate deployment override does not fail `make verify`).
+2. If the store exists, assert it contains **no `*.ics`** — the general sweep cannot see inside it.
+3. Every entry in the store matches `^[0-9a-f]{32}\.(csv|xlsx)$` — one check that catches leftover
+   `.tmp` files, an accidental write of a user-supplied name, and any stray artifact.
+4. Extend the forbidden repo-root directory list from `{uploads, generated}` to
+   `{uploads, generated, schedules}` — the store must never be created outside `data/`.
+
+Add a success line: `schedule store: data/schedules (N files)`.
+
+**[.gitignore](.gitignore) needs no change** — `data/` at line 45 already covers `data/schedules/`.
+State this in the task so nobody adds a redundant rule.
+
+**8. Backend tests**
+
+New `backend/tests/test_schedule_store_service.py` — saves inside the configured directory; stored
+name is opaque and keeps the extension; row records the sanitized original + uploader; replacement
+deletes the previous file and keeps exactly one row; no `.tmp` survives; a failed commit removes the
+new file; orphans are purged; loading with no row raises `NO_ACTIVE_SCHEDULE`; a row whose file is
+missing is dropped and reported absent; `../../evil.csv` lands in the store under a uuid.
+
+New `backend/tests/test_active_schedule_endpoint.py` — `GET` reports null before any upload for both
+roles; `GET` 401 anonymous; super-user upload then `GET` reports it; response never exposes the uuid
+or a local path; plain user `PUT` → 403; anonymous `PUT` → 401; missing/oversized/unsupported upload
+map to 422/413/415; a second upload replaces the first for every account; **plain user converts the
+active schedule successfully**; super-user converts the same one; convert with no schedule → 409
+`no_active_schedule`; partial and failure shapes; malformed CSV → safe 422; unexpected error → generic
+500 with no traceback or `/Users/`; repeated conversion does not mutate the stored file; **conversion
+writes no `.ics` anywhere**, using an `rglob` sweep that does *not* exclude `data/`; the default store
+lives under `data/`; OpenAPI declares the new responses.
+
+Existing files that change — exactly three:
+
+- [conftest.py](backend/tests/conftest.py): `os.environ.setdefault("FIREFIGHTER_TOOLS_SCHEDULE_STORE", tempfile.mkdtemp(...))`
+  in the same **pre-import** block as the DB URL; a new autouse `clean_schedule_store` fixture; a
+  `stored_schedule(client)` fixture that PUTs a known-good CSV.
+- [test_calendar_converter_endpoint.py](backend/tests/test_calendar_converter_endpoint.py) —
+  `test_every_expected_domain_error_has_an_http_mapping` extends to
+  `set(route._STORE_ERRORS) == set(ScheduleStoreErrorCode)`, its status set `{409, 500}`, and a new
+  totality assertion that every `FatalErrorCode` is reachable from some mapping.
+- [test_calendar_conversion_models.py](backend/tests/test_calendar_conversion_models.py) — cases for
+  the two new models (`extra="forbid"`, `size_bytes >= 0`, `schedule: None` accepted).
+
+**Anything else failing means churn leaked into `/convert` and should be backed out.** Expect roughly
+99 → ~130 backend tests.
+
+**9. Docs** — [PLAN.md](PLAN.md): rewrite lines 14/91/174 and the test-plan bullet at 164; add a
+"Schedule store" subsection (directory, opaque uuid names, singleton table, atomic `os.replace`,
+commit-then-purge, row-is-truth self-healing, `FIREFIGHTER_TOOLS_SCHEDULE_STORE`, "delete is a future
+task"); add the three endpoints and the 409 code to the Web API section; note explicitly that
+`POST …/convert` is **retained unchanged as a stateless super-user API with no UI caller** so it does
+not read as an oversight; add the store to the mermaid diagram; describe the two role experiences
+under User Experience. [AGENTS.md:60](AGENTS.md#L60): "retain no uploaded files" → retain only the
+single active schedule in the configured store under `data/`, never in the served or version-controlled
+tree; still never retain a generated calendar, never log schedule contents. [README.md](README.md):
+rewrite L125/L137/L159, document the new env var, split the converter workflow into "As a super-user"
+and "As a user", and add troubleshooting for "no schedule loaded" and how to reset the store.
+
+### TASK-041 — frontend
+
+**1. API client** — [api/calendarConverter.ts](frontend/src/api/calendarConverter.ts)
 
 ```ts
-export type RankColor = "red" | "yellow" | "neutral";
-export type RankPresentation = { label: string; color: RankColor };
+export const ACTIVE_SCHEDULE_ENDPOINT = "/api/v1/tools/calendar-converter/schedule";
+export const ACTIVE_SCHEDULE_CONVERT_ENDPOINT = "/api/v1/tools/calendar-converter/schedule/convert";
 
-// Keyed by the tolerant match key (see below). Labels are the canonical
-// abbreviations; deputies always carry the hyphenated "-STV" suffix.
-const KNOWN_RANKS: Record<string, RankPresentation> = {
-  KDT:     { label: "KDT",      color: "red" },
-  KDTSTV:  { label: "KDT-STV",  color: "red" },
-  ZKDT:    { label: "ZKDT",     color: "yellow" },
-  ZKDTSTV: { label: "ZKDT-STV", color: "yellow" },
-  GKDT:    { label: "GKDT",     color: "yellow" },
-  GKDTSTV: { label: "GKDT-STV", color: "yellow" },
-  FWM:     { label: "FWM",      color: "neutral" },
-};
+export type ActiveSchedule = { filename: string; size_bytes: number; uploaded_at: string; uploaded_by: string };
+export type ActiveScheduleResponse = { schedule: ActiveSchedule | null };
 
-export function presentRank(rawRank: string): RankPresentation | null {
-  const trimmed = rawRank.trim();
-  if (trimmed === "") return null;
-
-  const key = trimmed
-    .toUpperCase()
-    .replace(/STELLVERTRETER/g, "STV") // spelled-out deputy → STV
-    .replace(/[^A-Z0-9]/g, "");        // drop hyphens/spaces/punctuation
-
-  const known = KNOWN_RANKS[key];
-  if (known) return known;
-
-  // Unknown rank stays neutral, but a deputy still reads "<BASE>-STV".
-  if (key.length > 3 && key.endsWith("STV")) {
-    return { label: `${key.slice(0, -3)}-STV`, color: "neutral" };
-  }
-  return { label: trimmed.toUpperCase(), color: "neutral" };
-}
+export async function fetchActiveSchedule(options?): Promise<ActiveScheduleResult>;
+export async function uploadActiveSchedule(file: File, options?): Promise<ActiveScheduleResult>;  // PUT + FormData
+export async function convertActiveSchedule(options?): Promise<CalendarConverterResult>;          // POST, no body
 ```
 
-### 3. `frontend/src/components/IdentityPanel.tsx` (new)
+Add guards `isActiveSchedule` / `isActiveScheduleResponse` in the existing `isRecord` /
+`isNonNegativeInteger` style. **Add `"no_active_schedule"` to the `ApiErrorCode` union *and* to the
+`apiErrorCodes` Set at [calendarConverter.ts:83](frontend/src/api/calendarConverter.ts#L83)** —
+forgetting the Set silently turns a 409 into a thrown contract error. Make that a named test.
 
-Follows `UserMenu.tsx` conventions (2-space indent, `useAuth()` + `useI18n()`, early
-`return null` when `user === null`).
+**2. Component split** — [CalendarConverterPage.tsx](frontend/src/pages/CalendarConverterPage.tsx)
+stays the route module and shrinks to orchestration:
 
-Rendered markup:
-
-```tsx
-<section className="panel identity-panel" aria-labelledby="identity-heading">
-  <h2 id="identity-heading" className="identity-heading">{t("identityHeading")}</h2>
-
-  <p className="identity-account">
-    <span className="identity-account-label">{t("authSignedInAs")}</span>
-    <span className="identity-username">{user.username}</span>
-  </p>
-
-  {fullName && <p className="identity-fullname">{fullName}</p>}
-
-  {tags.length > 0 && (
-    <ul className="identity-tags" aria-label={t("identityProfileLabel")}>
-      {rank && (
-        <li className={`identity-tag${rank.color !== "neutral" ? ` identity-tag-rank-${rank.color}` : ""}`}>
-          <span className="visually-hidden">{t("identityRankLabel")}: </span>{rank.label}
-        </li>
-      )}
-      {zug && <li className="identity-tag">{t("identityZugLabel")} {zug}</li>}
-      {gruppe && <li className="identity-tag">{t("identityGruppeLabel")} {gruppe}</li>}
-    </ul>
-  )}
-</section>
+```
+CalendarConverterPage                        (owns all state)
+├── intro + <aside className="converter-help">        everyone
+├── .converter-workspace
+│   ├── <ActiveScheduleCard />                        everyone
+│   ├── .convert-actions (button + live region)       everyone
+│   ├── <ConversionResultPanel variant={…} />         everyone, role-shaped
+│   └── <RequireSuperUser fallback={null}>
+│         <ScheduleUploadForm onUploaded={…} />       super_user only
+└── back link
 ```
 
-Data handling:
-- `fullName = [user.name, user.surname].filter(Boolean).join(" ")` — omit the line when empty.
-- `rank = user.rank ? presentRank(user.rank) : null` — omit the tag when null/blank.
-- `zug` / `gruppe` — trim; omit the tag when null/blank.
-- `.visually-hidden` already exists in `styles.css` (used by the skip link / native picker).
+New: `frontend/src/components/ActiveScheduleCard.tsx` (plus an exported `formatScheduleSize`),
+`frontend/src/components/ConversionResultPanel.tsx` (moves `ConversionResultPanel`, `InvalidEventItem`
+and `downloadCalendar` out of the page; props `{ result, variant: "full" | "download", headingRef }`),
+`frontend/src/components/ScheduleUploadForm.tsx` (drop zone, picker, selected-file line, submit/reset).
 
-### 4. Wire into `frontend/src/pages/DashboardPage.tsx`
+Extracting `ConversionResultPanel` is a real fix: today it is **redefined inside the page's render
+function** ([CalendarConverterPage.tsx:295](frontend/src/pages/CalendarConverterPage.tsx#L295)), so
+React remounts the whole subtree on every state change.
 
-Import `IdentityPanel` and render `<IdentityPanel />` between the closing `</section>` of
-`.hero` and the tools `<section>`. `DashboardPage` does not currently call `useAuth()`;
-it does not need to — the panel reads auth itself. Route `/` is already `RequireAuth`-gated,
-so `user` is present in practice.
+Keep [RequireSuperUser](frontend/src/components/RequireSuperUser.tsx) and pass `fallback={null}` — its
+`fallback === undefined ? <Navigate/> : fallback` branch renders nothing for a plain user, which is
+exactly the required behavior. The page separately reads `useAuth()` for the result `variant`; safe,
+since the route already sits behind `RequireAuth`.
 
-### 5. Translation keys — `frontend/src/i18n/translations.ts`
+**3. State** — three independent unions replacing today's single one:
 
-Add the same keys to `germanTranslations` and `italianTranslations` (the parity test in
-`translations.test.ts` enforces identical key sets). Reuse the existing `authSignedInAs`
-key for "Angemeldet als" / "Connesso come".
-
-| key                   | de           | it (confirm org wording) |
-|-----------------------|--------------|--------------------------|
-| `identityHeading`     | `Wer bist du`| `Chi sei`                |
-| `identityProfileLabel`| `Dienstprofil` | `Profilo di servizio`  |
-| `identityRankLabel`   | `Dienstgrad` | `Grado`                  |
-| `identityZugLabel`    | `Zug`        | `Plotone`                |
-| `identityGruppeLabel` | `Gruppe`     | `Squadra`                |
-
-**Loose end to confirm during implementation:** whether Italian should keep `Zug` / `Gruppe`
-as-is (org-internal terms, like the untranslated brand) rather than `Plotone` / `Squadra`.
-Ask the user; it is a one-line change either way.
-
-### 6. Styles — append to `frontend/src/styles.css`
-
-New classes only; **no new tokens** (reuse `--color-danger-*`, `--color-warning-*`,
-`--color-canvas-accent`, `--color-border-strong`, spacing/radius/type scale). Model the pill
-on the existing `.role-badge` / `.tool-formats li`.
-
-```css
-/* Identity panel (home) */
-.identity-panel {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  max-width: var(--reading-width);
-  margin-bottom: var(--space-8);
-}
-.identity-heading {
-  margin: 0;
-  font-size: var(--font-size-sm);
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
-}
-.identity-account { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-2); margin: 0; font-size: var(--font-size-sm); }
-.identity-account-label { color: var(--color-text-muted); font-weight: 650; }
-.identity-username { font-weight: 750; overflow-wrap: anywhere; }
-.identity-fullname {
-  margin: 0;
-  font-size: var(--font-size-heading-sm);
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  overflow-wrap: anywhere;
-}
-.identity-tags { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
-.identity-tag {
-  display: inline-flex;
-  align-items: center;
-  min-height: 1.75rem;
-  padding: var(--space-1) var(--space-3);
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-pill);
-  background: var(--color-canvas-accent);
-  color: var(--color-text);
-  font-size: var(--font-size-sm);
-  font-weight: 750;
-}
-.identity-tag-rank-red { border-color: var(--color-danger-border); background: var(--color-danger-surface); color: var(--color-danger); }
-.identity-tag-rank-yellow { border-color: var(--color-warning-border); background: var(--color-warning-surface); color: var(--color-warning); }
+```ts
+type ScheduleState   = {status:"loading"} | {status:"empty"} | {status:"loaded"; schedule: ActiveSchedule}
+                     | {status:"unavailable"; errorCode: ApiErrorCode};
+type ConversionState = {status:"idle"} | {status:"converting"} | {status:"result"; result: ConversionResponse}
+                     | {status:"fatal"; errorCode: ApiErrorCode};
+type UploadState     = {status:"idle"} | {status:"selected"; file: File} | {status:"uploading"; file: File}
+                     | {status:"fatal"; file?: File; errorCode: ApiErrorCode};   // ScheduleUploadForm only
 ```
 
-Tags already wrap (`flex-wrap`), the panel is width-capped, and every value uses
-`overflow-wrap: anywhere`, so there is no 320 px overflow risk. Nothing here is interactive,
-so the 44 px target rule does not apply.
+Mount fetches the schedule with an `AbortController` cleanup. A successful upload sets `schedule` and
+resets `conversion` to `idle`. A `no_active_schedule` fatal **also** sets `schedule` to `empty`, matching
+the backend's self-heal. Preserve the existing `outcomeHeadingRef` focus effect, now keyed on
+`conversion`. Keep `hasSupportedExtension` and `downloadCalendar` as-is. The page stops calling
+`convertCalendar`; that function stays exported and covered by its own API test.
 
-### 7. Tests
+**4. Role split**
 
-- **`frontend/src/components/rankPresentation.test.ts`** (new, pure): `KDT`→
-  `{label:"KDT",color:"red"}`; canonical-label cases `kdt-stv`, `KDTSTV`, `KDT STV`, and
-  `KDT-Stellvertreter` all →`{label:"KDT-STV",color:"red"}`; `ZKDT`→yellow;
-  `ZKDT-STV`→`{label:"ZKDT-STV",color:"yellow"}` (deputy rule); `GKDT`→yellow;
-  `GKDT-STV`→yellow; `FWM`→`{label:"FWM",color:"neutral"}`; unknown (`"Löschmeister"`)→
-  `{label:"LÖSCHMEISTER",color:"neutral"}`; unknown deputy (`"LM-STV"`)→
-  `{label:"LM-STV",color:"neutral"}`; `""` / `"   "`→`null`.
-- **`frontend/src/components/IdentityPanel.test.tsx`** (new): render with
-  `renderApp("/", { user: { ...SUPER_USER, name:"Mario", surname:"Rossi", rank:"KDT", zug:"1", gruppe:"2" } })`
-  (helper at `frontend/src/test/renderApp.tsx`). Assert: "Angemeldet als" + username shown;
-  `.identity-fullname` element contains `Mario Rossi`; rank tag text `KDT` with class
-  `identity-tag-rank-red`; `GKDT-STV` → `identity-tag-rank-yellow`; `FWM` → no rank-colour
-  modifier; visible `Zug 1` / `Gruppe 2`; with `rank/zug/gruppe: null` those tags are absent
-  and, with `name`+`surname` null, `.identity-fullname` is absent; Italian variant via
-  `window.localStorage.setItem(LANGUAGE_STORAGE_KEY, "it")` shows `Connesso come` + the IT
-  prefixes.
-- **`frontend/src/pages/DashboardPage.test.tsx`**: add one assertion that the panel renders
-  (`screen.getByRole("heading", { name: "Wer bist du" })`) ahead of the tool card; confirm
-  the existing `getAllByRole("article")` length-1 assertion still holds (the panel is a
-  `<section>`, not an `article`).
-- **`frontend/src/styles.test.ts`**: extend the contract test — stylesheet contains
-  `.identity-panel`; `.identity-fullname` rule contains `text-transform: uppercase`;
-  `.identity-tag` rule contains `border-radius: var(--radius-pill)`;
-  `.identity-tag-rank-red` references `var(--color-danger`; `.identity-tag-rank-yellow`
-  references `var(--color-warning`.
-- **`frontend/src/i18n/translations.test.ts`**: the key-parity `it()` covers the new keys
-  automatically; add a spot-check that `identityHeading` differs between de and it.
-- Optional: add a line to `frontend/e2e/access-control.spec.ts` asserting the signed-in
-  dashboard shows the "Wer bist du" heading (kept minimal; `make test` already runs e2e).
+| Element | super_user | user |
+|---|---|---|
+| Schedule card (filename, uploaded at/by, size) | yes | yes |
+| Convert button, total + converted counts, download | yes | yes |
+| Skipped count | yes | **no** |
+| `.invalid-events` list + issue codes | yes | **no** |
+| Partial/failure guidance sentence | yes | yes |
+| Upload form / drop zone / file input | yes | **no** |
+| Help aside | 3 steps (upload, convert, download) | 2 steps (convert, download) |
 
-### 8. Record completion
+**5. Translations** — [i18n/translations.ts](frontend/src/i18n/translations.ts). `germanTranslations`
+is `as const` and **defines** `TranslationKey`, so a missing Italian key is a compile error — that is
+the safety net. Add `calendarActiveSchedule*` (title, loading, none, noneHint, unavailable, retry,
+filename, uploadedAt, uploadedBy, size), `calendarConvertActive`, `calendarUpload*` (title, submit,
+uploading, replaceNotice, success), `calendarHelpStepUpload`, and `errorNoActiveSchedule`.
 
-Move `TASK-039` out of `TODO.md` (back to `_None queued._`) and append the full record to
-`IMPLEMENTATION.md` with `Answer`, `Automated test`, and `Developer demo` sections
-(required since `TASK-004`), filling in the real post-change frontend test count.
+Rewrite `calendarHelpPrivacy` — it is now factually wrong. Suggested de: *"Der hochgeladene Dienstplan
+bleibt lokal auf diesem Server; erzeugte Kalender werden nicht gespeichert."*
+
+Remove `converterUploadRestrictedTitle` / `converterUploadRestricted` from both dictionaries — a plain
+user now gets a real experience. **This also requires editing
+[translations.test.ts:68-82](frontend/src/i18n/translations.test.ts#L68-L82)**, which spot-checks
+`converterUploadRestricted` for "Super-User"/"super-utente"; the key-parity test alone does not cover it.
+
+Add `no_active_schedule: "errorNoActiveSchedule"` to `apiErrorTranslationKeys` — the
+`satisfies Record<ApiErrorCode, TranslationKey>` makes this a compile error until done.
+
+No interpolation mechanism exists; every string is a standalone label or sentence. Format the
+timestamp at render with `new Intl.DateTimeFormat(language, { dateStyle: "medium", timeStyle: "short" })`
+using `language` from `useI18n()`.
+
+**6. Styles** — [styles.css](frontend/src/styles.css), existing tokens only: `.active-schedule` (card,
+`border-left` in `--color-brand`), `.active-schedule-empty` (`--color-warning`), `.active-schedule-meta`
+(`display: grid` dl, mirroring `.result-counts`), `.convert-actions` (`flex-wrap: wrap`),
+`.upload-panel` + `.upload-replace-notice`, `.schedule-upload-status` (live region). Remove the three
+`.upload-restricted` blocks at lines 884/895/900 — verified unreferenced by
+[styles.test.ts](frontend/src/styles.test.ts), so nothing breaks. Extend `styles.test.ts` in its
+existing text-regex style for the new classes, keeping `min-height: var(--target-size)` on anything
+interactive.
+
+**7. Frontend + e2e tests** — rewrite
+[CalendarConverterPage.test.tsx](frontend/src/pages/CalendarConverterPage.test.tsx) (the partial
+`vi.mock` now stubs `fetchActiveSchedule`/`uploadActiveSchedule`/`convertActiveSchedule`; the existing
+role test becomes "shows a plain user only the schedule, conversion, and download"); new
+`ActiveScheduleCard.test.tsx`, `ConversionResultPanel.test.tsx` (both variants against one partial
+fixture), `ScheduleUploadForm.test.tsx`; extend
+[calendarConverter.test.ts](frontend/src/api/calendarConverter.test.ts) for the three new functions and
+the 409 body.
+
+E2E: [database.ts](frontend/e2e/database.ts) gains `E2E_SCHEDULE_STORE` (`data/e2e-schedules`);
+[playwright.config.ts](frontend/playwright.config.ts) clears it and sets
+`FIREFIGHTER_TOOLS_SCHEDULE_STORE` in both `process.env` and `webServer.env` in the same pre-`webServer`
+block that clears the DB; `global-teardown.ts` removes it. Replace the "Upload ist eingeschränkt"
+assertion in [access-control.spec.ts](frontend/e2e/access-control.spec.ts) with: a plain user sees the
+schedule card and convert button, and still no file input and no diagnostics heading. Reshape
+[calendar-converter.spec.ts](frontend/e2e/calendar-converter.spec.ts) around upload-then-convert and
+extend its `afterAll` to assert `data/schedules` holds no `.ics`. New `active-schedule.spec.ts` for the
+cross-role journey: super-user uploads `partial.csv` and signs out → plain user signs in, sees the
+filename, converts, downloads, sees no diagnostics → super-user replaces with `valid.csv` → plain user
+sees the new filename. Keep `fullyParallel: false` and have each spec upload what it needs in
+`beforeEach` rather than relying on cross-file ordering.
+
+## Proposed TODO.md tasks
+
+Records in [IMPLEMENTATION.md](IMPLEMENTATION.md) use `### TASK-0NN - Title` (H3, space-hyphen-space)
+— note this differs from the `## TASK-0NN:` template in AGENTS.md; **follow the file**. New records
+belong under the existing `## Post-MVP feature work` heading.
+
+**TASK-040 — Store one active schedule on the server**
+
+> **Ask:** Let a super-user upload a source schedule to the server so it becomes the single active
+> schedule, and let every signed-in account start the conversion of that stored schedule and get the
+> calendar back. Add the storage, endpoints, and tests for this, and update PLAN.md.
+
+**TASK-041 — Split the converter interface by role**
+
+> **Ask:** Rework the calendar-converter page so a super-user sees the stored schedule, the upload
+> control, and the full skipped-event diagnostics, while a plain user sees only which schedule is
+> loaded, a convert button, the counts, and the download button. Cover both experiences with component
+> and end-to-end tests.
 
 ## Files
 
-| File | Change |
-|------|--------|
-| `TODO.md` | Restore queue template; add then later remove `TASK-039` |
-| `IMPLEMENTATION.md` | Append the completed `TASK-039` record |
-| `frontend/src/components/rankPresentation.ts` | **new** — `presentRank()` |
-| `frontend/src/components/rankPresentation.test.ts` | **new** |
-| `frontend/src/components/IdentityPanel.tsx` | **new** — the panel |
-| `frontend/src/components/IdentityPanel.test.tsx` | **new** |
-| `frontend/src/pages/DashboardPage.tsx` | render `<IdentityPanel />` between hero and tools |
-| `frontend/src/pages/DashboardPage.test.tsx` | one added assertion |
-| `frontend/src/i18n/translations.ts` | 5 new keys × 2 languages |
-| `frontend/src/i18n/translations.test.ts` | spot-check for `identityHeading` |
-| `frontend/src/styles.css` | append `.identity-*` rules |
-| `frontend/src/styles.test.ts` | contract assertions for the new classes |
+| File | Change | Task |
+|---|---|---|
+| [config.py](backend/src/firefighter_tools_backend/config.py) | `schedule_store_dir` + env var | 040 |
+| [db/models.py](backend/src/firefighter_tools_backend/db/models.py) | `ActiveScheduleRecord` singleton table | 040 |
+| [db/__init__.py](backend/src/firefighter_tools_backend/db/__init__.py) | re-export the new names | 040 |
+| `domain/schedule_store.py` | **new** — error codes, `StoredSchedule` | 040 |
+| `services/schedule_store.py` | **new** — save/find/load/open + purge | 040 |
+| [models/calendar_conversion.py](backend/src/firefighter_tools_backend/models/calendar_conversion.py) | `ActiveSchedule`, `ActiveScheduleResponse`, `NO_ACTIVE_SCHEDULE` | 040 |
+| [routes/calendar_converter.py](backend/src/firefighter_tools_backend/routes/calendar_converter.py) | three endpoints + `_STORE_ERRORS` | 040 |
+| [scripts/verify.py](scripts/verify.py) | four store invariants | 040 |
+| [conftest.py](backend/tests/conftest.py) | store env var, clean fixture, `stored_schedule` | 040 |
+| `tests/test_schedule_store_service.py` | **new** | 040 |
+| `tests/test_active_schedule_endpoint.py` | **new** | 040 |
+| [test_calendar_converter_endpoint.py](backend/tests/test_calendar_converter_endpoint.py) | extend the mapping-parity test | 040 |
+| [test_calendar_conversion_models.py](backend/tests/test_calendar_conversion_models.py) | new model cases | 040 |
+| [PLAN.md](PLAN.md) / [AGENTS.md](AGENTS.md) / [README.md](README.md) | retention posture, endpoints, workflows | 040 |
+| [api/calendarConverter.ts](frontend/src/api/calendarConverter.ts) | 3 functions, 2 guards, new error code | 041 |
+| `components/ActiveScheduleCard.tsx` / `ConversionResultPanel.tsx` / `ScheduleUploadForm.tsx` | **new** (+ tests) | 041 |
+| [pages/CalendarConverterPage.tsx](frontend/src/pages/CalendarConverterPage.tsx) | orchestration only, 3 state unions | 041 |
+| [i18n/translations.ts](frontend/src/i18n/translations.ts) | ~18 keys × 2, rewrite privacy, drop restricted | 041 |
+| [i18n/translations.test.ts](frontend/src/i18n/translations.test.ts) | drop the restricted spot-check, add the new code | 041 |
+| [styles.css](frontend/src/styles.css) / [styles.test.ts](frontend/src/styles.test.ts) | new classes, remove `.upload-restricted` | 041 |
+| [e2e/](frontend/e2e/) + [playwright.config.ts](frontend/playwright.config.ts) | store env, reshaped specs, new cross-role spec | 041 |
 
 ## Verification
 
-**Automated (from repo root unless noted):**
+**Automated**
 
-1. `cd frontend && ./node_modules/.bin/vitest run` — all suites pass, including the new
-   `rankPresentation` and `IdentityPanel` tests.
-2. From `frontend/`: `./node_modules/.bin/tsc -b && ./node_modules/.bin/vite build` —
-   strict type-check and production build succeed.
-3. `make test` — backend (99, unchanged), frontend (new total), integration, and Playwright
-   e2e stages all pass.
-4. `git diff --check` — no output.
+```shell
+# TASK-040
+backend/.venv/bin/python -m pytest backend/tests -q         # ~130 passed (from 99)
+make verify                                                  # new store invariants report
 
-**Developer demo:**
+# TASK-041
+cd frontend && ./node_modules/.bin/tsc -b                    # catches a missing it key or unmapped error code
+make test-frontend
+make test-e2e
 
-1. Create an account with a full profile:
-   `backend/.venv/bin/python -m firefighter_tools_backend create-user --username chief --role super_user --name Mario --surname Rossi --rank KDT --zug 1 --gruppe 2`
-   (repeat with `--rank GKDT-STV` and `--rank FWM` for other accounts).
-2. `make dev` (or `make run`), open `http://127.0.0.1:5173/`, sign in.
-3. Confirm the home page shows, above the tool card: `Angemeldet als chief`, `MARIO ROSSI`
-   in capitals, and three circled soft-background tags — `KDT` in red, `Zug 1` and
-   `Gruppe 2` in neutral. Sign in as the other accounts and confirm `GKDT-STV` is amber and
-   `FWM` is neutral.
-4. Switch `Deutsch` ↔ `Italiano`: heading, "Angemeldet als"/"Connesso come", and the
-   Zug/Gruppe prefixes translate; abbreviations stay unchanged.
-5. Resize to ~320 px — tags wrap, no horizontal scrolling. Set browser zoom to 200% — the
-   panel reflows without clipping.
-6. Sign in as an account with no `rank`/`zug`/`gruppe`/`surname` and confirm the panel
-   gracefully shows only `Angemeldet als …` and the first name.
-
-
-## Context
-
-[TODO.md](../../Develop/firefighter-app-ui/TODO.md) currently holds an **un-numbered design brief** ("Implementation of database"), not a `TASK-0NN` entry. It proposes a scope expansion:
-
-- A persisted **user database**.
-- Two roles: **`super-user`** (may upload calendar source files) and **`user`** (may only use tools / download).
-- A `user` starts with the attributes `name`, `surname`, `rank`, `zug`, `gruppe`.
-- Future (explicitly out of scope now): the calendar tool returns a calendar *specific to the signed-in user*.
-
-This contradicts [PLAN.md](../../Develop/firefighter-app-ui/PLAN.md), which today states *"The MVP has no accounts, database, analytics, background jobs, or server-side file history."* Per `AGENTS.md`, `PLAN.md` is the architectural source of truth and must be updated when boundaries change.
-
-The app runs **only on `127.0.0.1`**. Auth here is primarily about *role-gating behaviour on a trusted single machine* and preparing for the future per-user calendar feature — not internet-grade security (TLS, rate limiting, etc. remain a later phase).
-
-### Decisions already taken (via clarifying questions)
-
-| Question | Decision |
-| --- | --- |
-| How does a person authenticate? | **Username + password + session cookie** (hashed passwords, signed session). |
-| Where do user records live? | **SQLite + SQLAlchemy** (first persistence in the project). |
-| How is the work queued? | **Phased: `TASK-036`, `TASK-037`, `TASK-038`.** |
-| What about `PLAN.md`? | **Update it now** to make the user/role model part of the architecture. |
-
-### Consequence to make explicit for the user
-
-The **only current tool** is upload → convert → download, and that whole flow runs through the single `POST /api/v1/tools/calendar-converter/convert` endpoint, which consumes an upload. Gating uploads to `super-user` therefore means a plain `user` has **no usable tool yet** — the "download a calendar specific to the user" capability that would give normal users something to do is deferred by the brief itself. The plan handles this by showing normal users an explanatory panel where the upload form would be. This is worth confirming is acceptable before implementation.
-
----
-
-## Architecture: how auth fits the existing layering
-
-The backend already separates `routes → services → adapters → external`, with `models/` (Pydantic, HTTP-facing) and `domain/` (pure dataclasses/enums). The new work mirrors that exactly:
-
-```
-backend/src/firefighter_tools_backend/
-  config.py                      # NEW: typed settings (pydantic-settings)
-  db/                            # NEW: SQLAlchemy engine, Base, session factory
-    __init__.py
-    engine.py                    #   create_engine(settings.database_url), SessionLocal
-    models.py                    #   UserRecord table (ORM)
-  domain/user.py                 # NEW: User dataclass, Role enum, typed auth errors + codes
-  adapters/user_repository.py    # NEW: CRUD over UserRecord <-> domain User
-  services/auth.py               # NEW: hash_password, verify_password, authenticate, get_user
-  models/auth.py                 # NEW: LoginRequest, SessionUser, AuthErrorResponse, AuthErrorCode
-  routes/auth.py                 # NEW: POST /login, POST /logout, GET /me
-  dependencies.py                # NEW: get_db, get_current_user, require_super_user
-  main.py                        # EDIT: SessionMiddleware, lifespan create_all, include auth_router
-  routes/calendar_converter.py   # EDIT: Depends(require_super_user) on /convert
-  __main__.py                    # EDIT: `create-user` subcommand (expanded in TASK-038)
+# both
+make test          # backend, frontend, integration, e2e, verify
+git diff --check   # no output
 ```
 
-Frontend mirrors the existing `I18nProvider` context pattern:
+**Developer demo**
 
-```
-frontend/src/
-  api/auth.ts                    # NEW: login/logout/fetchCurrentUser + runtime contract guards
-  auth/AuthProvider.tsx          # NEW: <AuthProvider> + useAuth() (shape copied from I18nProvider)
-  components/RequireAuth.tsx     # NEW: route guard -> redirect to /login
-  components/RequireSuperUser.tsx# NEW: role guard for the upload surface
-  components/UserMenu.tsx        # NEW: "signed in as", role badge, sign-out (goes in .header-actions)
-  pages/LoginPage.tsx            # NEW: /login form
-  App.tsx                        # EDIT: wrap in <AuthProvider>, add /login, guard existing routes
-  pages/CalendarConverterPage.tsx# EDIT: gate the upload <form> behind super-user
-  i18n/translations.ts           # EDIT: add auth*/login*/role* keys to BOTH de and it dicts
-  styles.css                     # EDIT: login form, user menu, role badge
-```
-
-### Session mechanism
-
-Starlette `SessionMiddleware` (signed cookie, needs `itsdangerous`). The cookie stores only `user_id`; `httponly`, `samesite=lax`, `secure=false` (loopback http). Secret from `FIREFIGHTER_TOOLS_SECRET_KEY` env var with a dev-only default in `config.py`. Logout = `request.session.clear()`. No CORS changes needed — dev traffic is same-origin through the Vite proxy, prod is single-origin; `fetch` sends same-origin cookies by default, so the existing calendar-converter client needs no change (its "no credentials header" test stays valid).
-
-### New backend dependencies (`backend/pyproject.toml` `[project.dependencies]`)
-
-- `sqlalchemy>=2,<3`
-- `pydantic-settings>=2,<3`
-- `pwdlib[argon2]>=0.2` (modern password hashing; argon2)
-- `itsdangerous>=2,<3` (SessionMiddleware signing)
-
-`make setup` already runs `pip install -e 'backend[test]'`, so it picks these up with no Makefile change.
-
-### `.gitignore`
-
-Add `*.db`, `*.sqlite3`, and `data/` (default DB path `sqlite:///./data/firefighter.db`). `.env` / `.env.*` are already ignored. `scripts/verify.py` only flags stray `.ics` files, so a local `.db` does not trip it.
-
----
-
-## TASK-036 — Backend user store, authentication, and endpoint gating
-
-**Ask (for the user to place in `TODO.md`):** Add a SQLite user database with `super-user` and `user` roles, username/password authentication with a session cookie, and gate the calendar-converter upload endpoint to `super-user`.
-
-Scope:
-
-1. **`config.py`** — `Settings(BaseSettings)`: `database_url` (default `sqlite:///./data/firefighter.db`), `secret_key` (dev default + warning), `session_cookie_name`, `session_max_age`. `.env` support via `pydantic-settings`.
-2. **`db/`** — `Base`, `engine`, `SessionLocal`. `UserRecord`: `id` PK, `username` unique/indexed, `password_hash`, `role` (`super_user` | `user`), `name`, `surname`, `rank`, `zug`, `gruppe` (nullable strings for MVP), `created_at`.
-3. **`domain/user.py`** — frozen `User` dataclass, `Role` enum, `AuthError` + `AuthErrorCode` (`invalid_credentials`, `not_authenticated`, `forbidden`), following the existing `domain/upload.py` error style.
-4. **`adapters/user_repository.py`** — `get_by_username`, `get_by_id`, `add`, `list_all`, `set_password_hash`, `delete`; maps `UserRecord` ↔ domain `User` (never returns the hash outside the service layer).
-5. **`services/auth.py`** — `hash_password`, `verify_password` (pwdlib argon2), `authenticate(session, username, password) -> User`, `get_user(session, user_id)`.
-6. **`models/auth.py`** — `LoginRequest{username,password}`; `SessionUser` (safe public shape: `username`, `role`, `name`, `surname`, `rank`, `zug`, `gruppe` — no hash); `AuthErrorResponse{code,message}` extending the existing `ContractModel` (`extra="forbid"`).
-7. **`dependencies.py`** — `get_db` (yields a session), `get_current_user` (reads `request.session["user_id"]`, 401 `AuthErrorResponse` if absent/invalid), `require_super_user` (403 if `role != super_user`).
-8. **`routes/auth.py`** — `POST /api/v1/auth/login` (sets session, returns `SessionUser`), `POST /api/v1/auth/logout` (clears session), `GET /api/v1/auth/me` (returns `SessionUser` or 401).
-9. **`main.py`** — add `SessionMiddleware`; add a `lifespan` that runs `Base.metadata.create_all` (Alembic noted as a later addition, not MVP); `include_router(auth_router, prefix=API_PREFIX)`. Keep the SPA catch-all registered last (it already 404s `/api/...`).
-10. **`routes/calendar_converter.py`** — add `_: User = Depends(require_super_user)` to `convert_calendar_upload`. Add `Depends(get_current_user)` to `GET /example` (any signed-in user may download). `GET /health` stays public.
-11. **`__main__.py`** — add a `create-user` subcommand (`--username`, `--role`, `--name/--surname/--rank/--zug/--gruppe`, password via `getpass`, never echoed or logged). Needed so TASK-036's own tests/demo can create the first super-user; TASK-038 expands the CLI.
-12. **`.gitignore`** — add `*.db`, `*.sqlite3`, `data/`.
-13. **Tests** — `backend/tests/conftest.py` (first in repo): in-memory SQLite engine, `get_db` dependency override, `client`, `super_user_client`, `user_client` fixtures. New `tests/test_auth.py`: login success/failure, `/me`, logout, `require_super_user` returns 401 vs 403, password stored as argon2 hash (never plaintext), no traceback leakage. **Update existing** `test_calendar_converter_endpoint.py`, `test_calendar_converter_boundaries.py`, `test_production_frontend.py` to call `/convert` and `/example` through an authenticated super-user client (this is unavoidable churn — the un-authenticated calls now return 401/403). The AST import-guard test still passes (no `subprocess` import added).
-14. **`AGENTS.md` security section** — add a bullet: passwords are argon2-hashed and never logged; the SQLite DB and `.env` are git-ignored; the session secret comes from the environment.
-
-Reuse: existing `ContractModel` (`models/calendar_conversion.py:11`), the `domain/` error-with-code pattern (`domain/upload.py`), the per-file `client` fixture pattern already in the converter tests.
-
----
-
-## TASK-037 — Frontend identity and role-gated UI
-
-**Ask (for the user to place in `TODO.md`):** Add a bilingual login screen, an auth context, route guards, a header user menu with sign-out, and hide the calendar-converter upload form from non-`super-user` accounts.
-
-Scope:
-
-1. **`src/api/auth.ts`** — `login(username,password)`, `logout()`, `fetchCurrentUser()`; TS types matching `SessionUser` / `AuthErrorResponse`; runtime type-guards and a `AuthContractError`, mirroring `src/api/calendarConverter.ts`. Relies on the default `same-origin` fetch credentials.
-2. **`src/auth/AuthProvider.tsx`** — `createContext<AuthContextValue | null>(null)`, provider holding `{ user, status: "loading"|"authenticated"|"anonymous", login, logout }`, calls `fetchCurrentUser()` on mount, `useI18n`-style `useAuth()` hook that throws outside the provider. No token in storage (cookie is `httponly`; re-fetch `/me` on load).
-3. **`src/pages/LoginPage.tsx`** — accessible form (labelled inputs, `role="alert"` error, visible focus), redirects to the intended route or `/` on success.
-4. **`src/components/RequireAuth.tsx`** — while `loading` render a spinner/nothing; if `anonymous` `<Navigate to="/login" state={{from}}>`; else render children. **`RequireSuperUser.tsx`** — same, but checks `user.role`.
-5. **`src/components/UserMenu.tsx`** — "signed in as {name}", role badge, sign-out button; placed in `.header-actions` in `App.tsx` beside `<LanguageSwitch />` (the flex row already adapts on mobile).
-6. **`App.tsx`** — wrap `<AppContent />` in `<AuthProvider>` (nested with `<I18nProvider>`); add `<Route path="/login">`; wrap `/` and `/tools/calendar-converter` elements in `<RequireAuth>`.
-7. **`src/pages/CalendarConverterPage.tsx`** — wrap the upload `<form>` block (drop zone + file input + submit) so it renders only for `super_user`; for a plain `user`, render a translated info panel ("upload is restricted to super-users; personalised downloads are coming in a future version"). The example-download link and help panel stay visible.
-8. **`src/i18n/translations.ts`** — add keys to **both** `germanTranslations` and `italianTranslations` (the parity test enforces lockstep): `authSignIn`, `authSignOut`, `authSignedInAs`, `authUsername`, `authPassword`, `authInvalidCredentials`, `authSessionExpired`, `roleSuperUser`, `roleUser`, `converterUploadRestricted`, plus labels for `rank` / `zug` / `gruppe` if surfaced.
-9. **`src/styles.css`** — login form, user menu, role badge; keep 44 px targets, AA contrast, visible focus, no 320 px overflow (existing stylesheet contract tests).
-10. **Tests** — a `renderWithProviders` helper wrapping `<AuthProvider>` + `<I18nProvider>` + router, with `fetchCurrentUser` mocked (`vi.mock`, as `convertCalendar` is mocked today). Update `App.test.tsx`, `DashboardPage.test.tsx`, `CalendarConverterPage.test.tsx` to render authenticated; new `LoginPage.test.tsx`, `AuthProvider.test.tsx`. This is broad but mechanical churn.
-11. **E2E** (`frontend/e2e/`) — add a Playwright `globalSetup` that seeds a super-user and a plain user in a temp DB (via the `create-user` CLI), a login helper, and update the specs to sign in first; add one spec asserting a plain user cannot see the upload form.
-
-Reuse: `I18nProvider.tsx` shape (context + hook + provider), the `vi.mock` + `vi.fn()` stub pattern from `CalendarConverterPage.test.tsx`, the Map-backed `localStorage` mock already in `src/test/setup.ts`.
-
----
-
-## TASK-038 — User administration
-
-**Ask (for the user to place in `TODO.md`):** Provide commands to create, list, update the password of, and delete users, plus first-run documentation for creating the initial super-user.
-
-Scope:
-
-1. **`__main__.py`** — expand the CLI: `create-user` (from TASK-036), `list-users` (username, role, profile fields — never the hash), `set-password` (getpass), `delete-user`. All password input via `getpass`, never echoed, never logged.
-2. **Optional (confirm scope with user):** a `super-user`-only `GET /api/v1/users` + `POST /api/v1/users` and a minimal admin page. Recommendation: **CLI-first for MVP**, admin UI as a follow-up task — the brief does not ask for a management UI.
-3. **Docs** — README "User accounts" section: create a super-user before first login, role meanings, where the DB file lives, that it is git-ignored and never committed. A `make create-user` convenience target (optional).
-4. **Seeding** — document `python -m firefighter_tools_backend create-user ...`. Optionally a `--from-file users.json` importer where the file carries profile fields only (no passwords — prompt per user, or generate and print once).
-5. **Tests** — `backend/tests/test_user_cli.py`: create/list/set-password/delete round-trip against a temp DB; asserts listing never prints a hash.
-
----
-
-## Cross-cutting: `PLAN.md` update (part of TASK-036)
-
-- **Architecture and Interfaces** — add a "Users and access control" subsection; extend the mermaid diagram with an auth boundary and the SQLite user store; document `POST /api/v1/auth/login|logout` and `GET /api/v1/auth/me`; note `/convert` requires `super-user`.
-- **Assumptions and Later Roadmap** — replace *"The MVP has no accounts, database…"* with: accounts and a local SQLite user store are now in scope; analytics, background jobs, and server-side *file* history remain out. Keep the note that internet publication (TLS, rate limiting, real session hardening) is still a separate phase.
-- **Test Plan and Acceptance Criteria** — add bullets for authentication, role gating, and the "plain user sees no upload form" behaviour.
-
----
-
-## Verification
-
-Per-task automated tests (run from repo root unless noted):
-
-- **TASK-036:** `make test-backend` — new `tests/test_auth.py` passes; updated converter/production tests pass with the authenticated fixtures. `make verify` still green (loopback host, no retained `.ics`). Manual demo: `backend/.venv/bin/python -m firefighter_tools_backend create-user --username chief --role super_user`, then `make run`, then `curl -i -c jar -b jar -X POST 127.0.0.1:8000/api/v1/auth/login -H 'content-type: application/json' -d '{"username":"chief","password":"…"}'` → 200 + `Set-Cookie`; `curl -b jar 127.0.0.1:8000/api/v1/auth/me` → the user; `POST /api/v1/tools/calendar-converter/convert` without the cookie → 401, with a plain-user cookie → 403, with the super-user cookie → normal conversion.
-- **TASK-037:** `make test-frontend` — updated + new Vitest suites pass. `make test-e2e` — login flow + "plain user has no upload form" spec pass. Manual demo: `make run`, open `http://127.0.0.1:8000`, get redirected to `/login`, sign in as the super-user → dashboard + converter upload form visible + user menu shows the name and a "Super-User" badge; sign out → back to `/login`; sign in as a plain user → converter page shows the restriction panel, no file input.
-- **TASK-038:** `make test-backend` — `tests/test_user_cli.py` passes. Manual demo: `python -m firefighter_tools_backend list-users` shows both accounts with roles and no hashes; `set-password` then re-login works; `delete-user` then login fails with `invalid_credentials`.
-
-Full gate before declaring any task done: `make test` (backend, frontend, integration, e2e, verify) from the repo root.
-
----
+1. `make run`, open `http://127.0.0.1:8000`, sign in as the super-user.
+2. Open the calendar converter — it reports no schedule is loaded. Upload
+   `assets/examples/calendar_schedule_example.xlsx`; the card shows the filename, uploader, and time.
+3. Press convert → counts, the skipped-event list (if any), and a working ICS download.
+4. Sign out, sign in as a plain `user`. The page shows the same schedule card, a convert button, and
+   **no** file input and **no** diagnostics. Convert and download successfully.
+5. Sign back in as the super-user, upload a different file, and confirm the plain user's page shows
+   the new filename.
+6. `ls data/schedules` → exactly one opaque `<uuid>.xlsx`; no `.ics` anywhere in the repo.
 
 ## Risks / notes
 
-- **Test churn.** Introducing auth breaks every backend test that calls `/convert` unauthenticated and every frontend test that renders `<App />`. Both are updated within their owning task (036 backend, 037 frontend) via shared fixtures/helpers — mechanical but touches many files.
-- **Plain users have no tool until the future per-user calendar feature.** Handled with an explanatory panel; confirm this UX is acceptable.
-- **`create_all` vs migrations.** MVP uses `Base.metadata.create_all`; Alembic is a sensible later addition once the schema evolves (e.g. when the per-user calendar feature adds columns).
-- **Loopback-only security posture is unchanged.** Anyone with an account on the machine can reach the server; passwords/roles gate *behaviour*, not the network. Real hardening stays a later phase, as `PLAN.md` will continue to state.
+1. **Import-time `settings`.** `settings = load_settings()` runs once at import, so `conftest.py` must
+   set the store env var **before** its imports, and the service must read via `store_directory()`.
+   Getting this wrong makes tests write into the developer's real `data/schedules/`.
+2. **The privacy posture genuinely changes.** A firefighter's roster now sits on disk between
+   sessions. The doc rewrites and the new `verify.py` invariants are part of TASK-040's definition of
+   done, not cleanup.
+3. **Expired session on a page that now fetches on mount.** A 401 body is `AuthErrorResponse`, whose
+   `code` is not in `apiErrorCodes`, so the guard fails and the client throws a contract error that the
+   page maps to a generic `internal_error`. This pre-exists in `convertCalendar` but the mount-time GET
+   makes it far more reachable. Document it; a dedicated session-expiry message is a follow-up.
+4. **Replace-during-convert race.** POSIX keeps an open handle valid after unlink and the window is
+   microseconds on a single-user loopback app. Document it; do not add locking.
+5. **No migration path.** `create_all` handles the new table, but a later column change to
+   `active_schedule` has no upgrade story. Record in PLAN.md that this is the trigger for the Alembic
+   conversation.
+6. **Scope leak into `/convert`.** The 99 existing backend tests are the tripwire — only
+   `test_every_expected_domain_error_has_an_http_mapping` should need changing.
+7. **Untracked [assets/examples/calendar-cesare.xlsx](assets/examples/calendar-cesare.xlsx)** is staged
+   but committed nowhere and referenced by nothing. Unrelated to this work; confirm whether it should
+   be committed or dropped.
 
-## Process note
+## Next step
 
-Per `AGENTS.md`, agents must not create `TODO.md` task entries until the user confirms. This plan proposes the three asks above; once you approve, use the `/todo-task` skill to append `TASK-036` (verbatim ask), implement and verify it, record it in `IMPLEMENTATION.md`, then repeat for `TASK-037` and `TASK-038`. `TASK-035` is the current highest identifier.
+Nothing is queued yet. Once the two asks above are confirmed, use the `/todo-task` skill to append
+`TASK-040` to [TODO.md](TODO.md) with its ask verbatim, implement and verify it, record it in
+[IMPLEMENTATION.md](IMPLEMENTATION.md), then repeat for `TASK-041`.

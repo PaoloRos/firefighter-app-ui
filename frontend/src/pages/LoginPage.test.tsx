@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -115,7 +115,10 @@ describe("LoginPage", () => {
     // no-op instead of a sign-in.
     renderApp("/login", { status: "anonymous", user: null });
 
-    fireEvent.click(screen.getByRole("button", { name: "Italiano" }));
+    // A real click moves focus to the button; jsdom's synthetic click does not.
+    const italianButton = screen.getByRole("button", { name: "Italiano" });
+    italianButton.focus();
+    fireEvent.click(italianButton);
 
     expect(screen.getByLabelText("Nome utente")).toHaveFocus();
   });
@@ -126,9 +129,30 @@ describe("LoginPage", () => {
     fireEvent.change(screen.getByLabelText("Benutzername"), {
       target: { value: "chief" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Italiano" }));
+    // A real click moves focus to the button; jsdom's synthetic click does not.
+    const italianButton = screen.getByRole("button", { name: "Italiano" });
+    italianButton.focus();
+    fireEvent.click(italianButton);
 
     expect(screen.getByLabelText("Password")).toHaveFocus();
+  });
+
+  it("keeps the caret in the username field when the session check resolves mid-typing", async () => {
+    let resolveSession: (user: SessionUser | null) => void = () => {};
+    mockedFetchCurrentUser.mockReturnValue(
+      new Promise((resolve) => {
+        resolveSession = resolve;
+      }),
+    );
+    renderLogin();
+
+    const usernameField = screen.getByLabelText("Benutzername");
+    fireEvent.change(usernameField, { target: { value: "ch" } });
+    await act(async () => {
+      resolveSession(null);
+    });
+
+    expect(usernameField).toHaveFocus();
   });
 
   it("shows a translated error for invalid credentials", async () => {

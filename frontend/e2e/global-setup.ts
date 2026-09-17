@@ -15,7 +15,7 @@ const backendPython = path.resolve(
  * Seed the throwaway user database before the browser tests run. The web
  * server has already started (Playwright runs plugin setup before global
  * setup) and holds this SQLite file open, so the file is written in place —
- * `playwright.config.ts` is responsible for starting from a clean file.
+ * the `webServer` command (`e2e/reset-state.mjs`) starts it from a clean file.
  */
 export default async function globalSetup(_config: FullConfig): Promise<void> {
   const env = {
@@ -37,9 +37,12 @@ export default async function globalSetup(_config: FullConfig): Promise<void> {
         account.role,
         "--name",
         account.username,
+        // getpass would read from the terminal when one is attached and ignore
+        // the piped input, so the password is passed on stdin explicitly.
+        "--password-stdin",
       ],
       {
-        input: `${account.password}\n${account.password}\n`,
+        input: `${account.password}\n`,
         stdio: ["pipe", "pipe", "pipe"],
         env,
       },

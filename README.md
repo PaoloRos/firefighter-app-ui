@@ -91,6 +91,9 @@ backend/.venv/bin/python -m firefighter_tools_backend set-password --username ch
 backend/.venv/bin/python -m firefighter_tools_backend delete-user --username m.rossi
 ```
 
+Scripts can pass `--password-stdin` to `create-user` or `set-password` to read
+the password from the first line of standard input instead of prompting.
+
 `set-password` and `delete-user` exit non-zero and change nothing when the
 named account does not exist.
 

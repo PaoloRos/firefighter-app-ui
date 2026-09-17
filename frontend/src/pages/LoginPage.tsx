@@ -21,6 +21,7 @@ export function LoginPage() {
   const [errorKey, setErrorKey] = useState<TranslationKey | null>(null);
   const usernameRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
 
   const redirectTo =
     (location.state as LocationState | null)?.from?.pathname ?? "/";
@@ -35,9 +36,14 @@ export function LoginPage() {
   // Put the caret in a field on arrival, and again after a header language
   // switch, which otherwise leaves focus on the language button where Enter
   // silently re-activates that button instead of signing in. The field values
-  // are read from the DOM so typing does not re-trigger this effect.
+  // are read from the DOM so typing does not re-trigger this effect. Focus
+  // already inside the form is left alone: the session check resolving while
+  // someone types must not yank the caret into the password field.
   useEffect(() => {
     if (status === "authenticated") {
+      return;
+    }
+    if (formRef.current?.contains(document.activeElement)) {
       return;
     }
 
@@ -81,7 +87,12 @@ export function LoginPage() {
       <h1 id="login-title">{t("authSignInTitle")}</h1>
       <p>{t("authSignInIntro")}</p>
 
-      <form className="login-form" onSubmit={handleSubmit} noValidate>
+      <form
+        ref={formRef}
+        className="login-form"
+        onSubmit={handleSubmit}
+        noValidate
+      >
         {errorKey !== null ? (
           <p className="form-message error-message" role="alert">
             {t(errorKey)}

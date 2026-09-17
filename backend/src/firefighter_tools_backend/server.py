@@ -12,7 +12,7 @@ HOST = "127.0.0.1"
 PORT = 8000
 
 
-def run(*, frontend_dist: Path | None = None) -> None:
+def run(*, frontend_dist: Path | None = None, port: int = PORT) -> None:
     """Serve the API, optionally with the built UI, on loopback only."""
     if settings.uses_development_secret_key:
         warnings.warn(
@@ -31,5 +31,5 @@ def run(*, frontend_dist: Path | None = None) -> None:
     uvicorn.run(
         application,
         host=HOST,
-        port=PORT,
+        port=port,
     )

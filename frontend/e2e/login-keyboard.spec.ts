@@ -12,6 +12,8 @@ test("signs in with Enter without ever using the mouse", async ({ page }) => {
   await page.goto("/login");
 
   // No click first: typing lands in the username field only if it is focused.
+  // Waiting for that focus keeps keystrokes from racing the React mount.
+  await expect(page.getByLabel("Benutzername")).toBeFocused();
   await page.keyboard.type(E2E_SUPER_USER.username);
   await page.keyboard.press("Tab");
   await page.keyboard.type(E2E_SUPER_USER.password);

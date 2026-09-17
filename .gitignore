@@ -48,3 +48,6 @@ data/
 *.db
 *.sqlite3
 list-users.json
+
+# Claude Code worktrees are local checkouts, never tracked
+.claude/worktrees/

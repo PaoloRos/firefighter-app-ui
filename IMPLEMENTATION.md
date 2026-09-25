@@ -1178,3 +1178,36 @@ This task also absorbed an unrelated change the project owner made to `assets/ex
 3. Sign out, fill both fields again, then click `Italiano` in the header and press `Enter` without clicking anything else. Confirm the sign-in starts rather than nothing happening.
 4. Repeat step 3 clicking `Deutsch` from the Italian interface and confirm it behaves the same way.
 5. Sign out, type only a username, then click `Italiano`. Confirm the caret lands in the password field so that typing the password and pressing `Enter` signs in.
+
+### TASK-044 - Add participant filtering to calendar-conversion v0.3.0
+
+**Ask:** In the calendar-conversion library, read an optional `participants` column (ids separated by `;` or `,`; empty or missing means everyone), add an optional `participant` argument to `convert_schedule` and a `--participant` CLI flag that keep only that person's events plus the everyone-events, keep CLI exit codes unchanged, and tag `v0.3.0` locally for me to push.
+
+**Answer:** Implemented in the sibling repository `../frameworks/calendar-conversion` as commit `8f34c95`, with a local annotated tag `v0.3.0` ("calendar-conversion 0.3.0"). Nothing was pushed.
+- **Model:** `Event` gained `participants: tuple[str, ...] = ()`, as its last field so positional construction is unaffected. An empty tuple means the event is for everyone.
+- **CSV reader:** reads the optional `participants` column and splits it on `;` or `,`, stripping and de-duplicating the ids in order. The column is not required, so older schedules convert exactly as before.
+- **XLSX reader:** writes a whole-number float in that column without its decimal part, because Excel may store a typed `101` as `101.0`, which would never match the id `101`.
+- **Service:** `convert_schedule` takes an optional `participant`.
+  - It validates the whole schedule first, so a duplicate ID is still caught when its two events belong to different people.
+  - It then keeps events through the new public `is_for_participant`: `None` keeps everything, an event without participants is kept for everyone, and otherwise the id must be listed exactly.
+  - Invalid events are filtered by the same rule, and the counts describe only the kept events. A blank `participant` raises `ValueError`.
+- **CLI:** `--participant ID` (`-p`) passes the id through and adds a `Participant:` line to the report only when set. A blank id is rejected by argparse with status 2. Exit codes are unchanged, and all 53 pre-existing tests pass unmodified.
+- **Docs:** the version is bumped to `0.3.0`. The README, the Sphinx sources (`input-format`, `getting-started`, `api`) and `IMPLEMENTATION_DECISIONS.md` are updated, and the committed HTML under `docs/` and the tracked `egg-info` are regenerated.
+- **Verification:**
+  - 65 library tests pass, up from 53. The 12 new tests cover separator parsing, a missing column, numeric XLSX cells, own/shared/everyone filtering, filtered invalid events, duplicate IDs across people, an empty personal result, a blank participant, and the CLI flag.
+  - The same 65 tests pass from a clean `git archive v0.3.0` export.
+  - The CLI was run manually on CSV and XLSX files.
+  - This app's backend suite was run against the new library source: 145 tests pass. The only 2 failures are the version pins asserting `0.2.0` in `test_calendar_converter_boundaries.py` and `test_sample_schedule.py`; moving them to `v0.3.0` is part of the planned per-person conversion task.
+
+**Automated test:**
+
+1. From `../frameworks/calendar-conversion`, run `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src .venv/bin/python -m unittest discover -s tests` and confirm `Ran 65 tests` and `OK`.
+2. In the same directory, run `git tag -n1` and confirm `v0.3.0 calendar-conversion 0.3.0` points at the new commit (`git log --oneline -1 v0.3.0` shows `8f34c95 Add participant filtering to schedule conversion`).
+
+**Developer demo:**
+
+1. In a scratch directory (`cd "$(mktemp -d)"`), create `demo.csv` with the header `id,summary,all_date,start_date,start_time,end_date,end_time,location,description,participants` and four events whose `participants` cells are `101`, `204`, `"101;204"`, and empty.
+2. Run `P=/Users/paolorossi/Develop/frameworks/calendar-conversion; $P/.venv/bin/python $P/main.py demo.csv --participant 101 --output mine.ics`. Confirm the report shows `Participant: 101`, `Valid and converted events: 3` and exit status 0, and that `mine.ics` has the 101, shared and everyone events but not the 204 event.
+3. Run the same command without `--participant` and with `--output all.ics`. Confirm all 4 events are converted and no `Participant:` line appears.
+4. Run `$P/.venv/bin/python $P/main.py --help` and confirm the `-p, --participant ID` option is listed.
+5. When satisfied, publish the tag yourself from the library repository with `git push origin main v0.3.0`.

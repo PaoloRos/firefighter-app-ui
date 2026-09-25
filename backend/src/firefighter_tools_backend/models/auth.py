@@ -33,6 +33,7 @@ class SessionUser(ContractModel):
     rank: str | None = None
     zug: str | None = None
     gruppe: str | None = None
+    personnel_number: str | None = None
 
 
 class AuthErrorResponse(ContractModel):

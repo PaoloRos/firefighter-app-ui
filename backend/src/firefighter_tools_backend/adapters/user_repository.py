@@ -19,6 +19,7 @@ def _to_user(record: UserRecord) -> User:
         rank=record.rank,
         zug=record.zug,
         gruppe=record.gruppe,
+        personnel_number=record.personnel_number,
     )
 
 
@@ -42,6 +43,19 @@ def get_auth_record(session: Session, username: str) -> AuthRecord | None:
     return AuthRecord(user=_to_user(record), password_hash=record.password_hash)
 
 
+def get_by_personnel_number(
+    session: Session,
+    personnel_number: str,
+) -> User | None:
+    """Return the account holding this personnel number, if any."""
+    record = session.scalars(
+        select(UserRecord).where(
+            UserRecord.personnel_number == personnel_number
+        )
+    ).one_or_none()
+    return None if record is None else _to_user(record)
+
+
 def list_all(session: Session) -> list[User]:
     """Return every account ordered by username, without password hashes."""
     records = session.scalars(
@@ -57,6 +71,7 @@ def add(
     password_hash: str,
     role: Role,
     profile: dict[str, str | None] | None = None,
+    personnel_number: str | None = None,
 ) -> User:
     """Insert a new account and return it as a domain user."""
     attributes = {field: None for field in _PROFILE_FIELDS}
@@ -68,6 +83,7 @@ def add(
         username=username,
         password_hash=password_hash,
         role=role.value,
+        personnel_number=personnel_number,
         **attributes,
     )
     session.add(record)
@@ -85,6 +101,20 @@ def set_password_hash(
     if record is None:
         return False
     record.password_hash = password_hash
+    session.commit()
+    return True
+
+
+def set_personnel_number(
+    session: Session,
+    username: str,
+    personnel_number: str | None,
+) -> bool:
+    """Set or clear an account's personnel number; report if it existed."""
+    record = _find_record(session, username)
+    if record is None:
+        return False
+    record.personnel_number = personnel_number
     session.commit()
     return True
 

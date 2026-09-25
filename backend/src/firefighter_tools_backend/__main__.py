@@ -7,11 +7,29 @@ from pathlib import Path
 
 from firefighter_tools_backend.adapters import user_repository
 from firefighter_tools_backend.db import create_session, init_db
-from firefighter_tools_backend.domain.user import Role
+from firefighter_tools_backend.domain.user import (
+    PersonnelNumberError,
+    PersonnelNumberErrorCode,
+    Role,
+    parse_personnel_number,
+)
 from firefighter_tools_backend.server import PORT, run
 from firefighter_tools_backend.services import auth
 
 _PROFILE_ARGUMENTS = ("name", "surname", "rank", "zug", "gruppe")
+_LISTED_FIELDS = ("personnel_number", *_PROFILE_ARGUMENTS)
+_PERSONNEL_NUMBER_HELP = (
+    "Personnel number matched against the schedule's participants column: "
+    "1-50 letters, digits, '.', '_' or '-'."
+)
+_PERSONNEL_NUMBER_MESSAGES = {
+    PersonnelNumberErrorCode.INVALID: (
+        "A personnel number must be 1-50 letters, digits, '.', '_' or '-'."
+    ),
+    PersonnelNumberErrorCode.TAKEN: (
+        "Personnel number {number!r} already belongs to another account."
+    ),
+}
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -45,6 +63,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     for field in _PROFILE_ARGUMENTS:
         create_user.add_argument(f"--{field}")
+    create_user.add_argument("--personnel-number", help=_PERSONNEL_NUMBER_HELP)
 
     subcommands.add_parser(
         "list-users",
@@ -57,6 +76,24 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     set_password.add_argument("--username", required=True)
     _add_password_stdin_argument(set_password)
+
+    set_personnel_number = subcommands.add_parser(
+        "set-personnel-number",
+        help="Assign, replace, or clear the personnel number of an account.",
+    )
+    set_personnel_number.add_argument("--username", required=True)
+    number_choice = set_personnel_number.add_mutually_exclusive_group(
+        required=True,
+    )
+    number_choice.add_argument(
+        "--personnel-number",
+        help=_PERSONNEL_NUMBER_HELP,
+    )
+    number_choice.add_argument(
+        "--clear",
+        action="store_true",
+        help="Remove the account's personnel number.",
+    )
 
     delete_user = subcommands.add_parser(
         "delete-user",
@@ -99,7 +136,24 @@ def _prompt_new_password() -> str | None:
     return password
 
 
+def _report_personnel_number_error(
+    error: PersonnelNumberError,
+    personnel_number: str,
+) -> int:
+    message = _PERSONNEL_NUMBER_MESSAGES[error.code]
+    print(message.format(number=personnel_number.strip()), file=sys.stderr)
+    return 1
+
+
 def _create_user(arguments: argparse.Namespace) -> int:
+    personnel_number = arguments.personnel_number
+    if personnel_number is not None:
+        # Reject a malformed number before asking for the password.
+        try:
+            parse_personnel_number(personnel_number)
+        except PersonnelNumberError as error:
+            return _report_personnel_number_error(error, personnel_number)
+
     password = _read_new_password(arguments)
     if password is None:
         return 2
@@ -122,7 +176,10 @@ def _create_user(arguments: argparse.Namespace) -> int:
             password=password,
             role=Role(arguments.role),
             profile=profile,
+            personnel_number=personnel_number,
         )
+    except PersonnelNumberError as error:
+        return _report_personnel_number_error(error, personnel_number or "")
     finally:
         session.close()
 
@@ -145,7 +202,7 @@ def _list_users() -> int:
     for user in users:
         profile = ", ".join(
             f"{field}={getattr(user, field)}"
-            for field in _PROFILE_ARGUMENTS
+            for field in _LISTED_FIELDS
             if getattr(user, field)
         )
         details = f" ({profile})" if profile else ""
@@ -173,6 +230,38 @@ def _set_password(arguments: argparse.Namespace) -> int:
         return 1
 
     print(f"Updated the password for {arguments.username!r}.")
+    return 0
+
+
+def _set_personnel_number(arguments: argparse.Namespace) -> int:
+    personnel_number = None if arguments.clear else arguments.personnel_number
+    init_db()
+    session = create_session()
+    try:
+        changed = auth.set_personnel_number(
+            session,
+            arguments.username,
+            personnel_number,
+        )
+    except PersonnelNumberError as error:
+        return _report_personnel_number_error(error, personnel_number or "")
+    finally:
+        session.close()
+
+    if not changed:
+        print(
+            f"User {arguments.username!r} does not exist.",
+            file=sys.stderr,
+        )
+        return 1
+
+    if personnel_number is None:
+        print(f"Cleared the personnel number of {arguments.username!r}.")
+    else:
+        print(
+            f"Set the personnel number of {arguments.username!r} to "
+            f"{personnel_number.strip()!r}."
+        )
     return 0
 
 
@@ -204,6 +293,8 @@ def main() -> None:
         raise SystemExit(_list_users())
     if arguments.command == "set-password":
         raise SystemExit(_set_password(arguments))
+    if arguments.command == "set-personnel-number":
+        raise SystemExit(_set_personnel_number(arguments))
     if arguments.command == "delete-user":
         raise SystemExit(_delete_user(arguments))
     run(frontend_dist=arguments.frontend_dist, port=arguments.port)

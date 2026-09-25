@@ -1,4 +1,4 @@
-"""Local persistence: engine, session factory, and schema creation."""
+"""Local persistence: engine, session factory, and schema migrations."""
 
 from firefighter_tools_backend.db.engine import (
     SessionLocal,
@@ -11,11 +11,12 @@ from firefighter_tools_backend.db.models import (
     Base,
     UserRecord,
 )
+from firefighter_tools_backend.db.schema import upgrade_schema
 
 
 def init_db() -> None:
-    """Create every table declared on ``Base`` if it does not exist yet."""
-    Base.metadata.create_all(engine)
+    """Migrate the configured database to the latest schema revision."""
+    upgrade_schema(engine)
 
 
 __all__ = [

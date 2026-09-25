@@ -11,8 +11,11 @@ from firefighter_tools_backend.adapters import user_repository
 from firefighter_tools_backend.domain.user import (
     AuthError,
     AuthErrorCode,
+    PersonnelNumberError,
+    PersonnelNumberErrorCode,
     Role,
     User,
+    parse_personnel_number,
 )
 
 _SCHEME = "scrypt"
@@ -92,14 +95,26 @@ def create_user(
     password: str,
     role: Role,
     profile: dict[str, str | None] | None = None,
+    personnel_number: str | None = None,
 ) -> User:
-    """Hash the password and persist a new account."""
+    """Hash the password and persist a new account.
+
+    Raises ``PersonnelNumberError`` when the personnel number is malformed or
+    already belongs to another account.
+    """
+    if personnel_number is not None:
+        personnel_number = _available_personnel_number(
+            session,
+            personnel_number,
+            username=username,
+        )
     return user_repository.add(
         session,
         username=username,
         password_hash=hash_password(password),
         role=role,
         profile=profile,
+        personnel_number=personnel_number,
     )
 
 
@@ -110,3 +125,39 @@ def set_password(session: Session, username: str, password: str) -> bool:
         username,
         hash_password(password),
     )
+
+
+def set_personnel_number(
+    session: Session,
+    username: str,
+    personnel_number: str | None,
+) -> bool:
+    """Assign, replace, or clear (``None``) one account's personnel number.
+
+    Returns whether the account existed. Raises ``PersonnelNumberError`` when
+    the number is malformed or already belongs to another account.
+    """
+    if personnel_number is not None:
+        personnel_number = _available_personnel_number(
+            session,
+            personnel_number,
+            username=username,
+        )
+    return user_repository.set_personnel_number(
+        session,
+        username,
+        personnel_number,
+    )
+
+
+def _available_personnel_number(
+    session: Session,
+    value: str,
+    *,
+    username: str,
+) -> str:
+    personnel_number = parse_personnel_number(value)
+    holder = user_repository.get_by_personnel_number(session, personnel_number)
+    if holder is not None and holder.username != username:
+        raise PersonnelNumberError(PersonnelNumberErrorCode.TAKEN)
+    return personnel_number

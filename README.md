@@ -46,8 +46,14 @@ Two roles exist:
 
 All account management happens through the `firefighter_tools_backend` module.
 Run the commands from the repository root after `make setup`; the database file
-and its schema are created automatically on first use, and a running server
-picks up new or changed accounts without a restart.
+is created on first use and its schema is migrated to the latest version
+automatically, and a running server picks up new or changed accounts without a
+restart.
+
+A database created before schema migrations were introduced is upgraded in
+place on the first start, keeping every account. Back up `data/firefighter.db`
+before that first start, for example with
+`cp data/firefighter.db data/firefighter.db.bak`.
 
 ### Add a user
 
@@ -68,6 +74,10 @@ Created super_user account 'chief'.
   least one `super_user` before the first sign-in.
 - Optional firefighter-profile flags: `--name`, `--surname`, `--rank`, `--zug`,
   `--gruppe`.
+- Optional `--personnel-number`: the id a schedule's `participants` column uses
+  for this person, 1–50 letters, digits, `.`, `_` or `-`. It must be unique;
+  a malformed number is rejected before the password prompt, and one that
+  already belongs to another account fails without creating anything.
 - Re-running `create-user` with an existing `--username` fails without changing
   the account.
 
@@ -75,7 +85,8 @@ Add a plain member the same way:
 
 ```shell
 backend/.venv/bin/python -m firefighter_tools_backend create-user \
-  --username m.rossi --role user --name Mario --surname Rossi --zug 1 --gruppe 2
+  --username m.rossi --role user --name Mario --surname Rossi --zug 1 --gruppe 2 \
+  --personnel-number 204
 ```
 
 ### Inspect and maintain accounts
@@ -87,6 +98,10 @@ backend/.venv/bin/python -m firefighter_tools_backend list-users
 # Replace one account's password (prompts twice)
 backend/.venv/bin/python -m firefighter_tools_backend set-password --username chief
 
+# Assign or replace one account's personnel number, or remove it
+backend/.venv/bin/python -m firefighter_tools_backend set-personnel-number --username chief --personnel-number 101
+backend/.venv/bin/python -m firefighter_tools_backend set-personnel-number --username chief --clear
+
 # Delete one account
 backend/.venv/bin/python -m firefighter_tools_backend delete-user --username m.rossi
 ```
@@ -94,8 +109,10 @@ backend/.venv/bin/python -m firefighter_tools_backend delete-user --username m.r
 Scripts can pass `--password-stdin` to `create-user` or `set-password` to read
 the password from the first line of standard input instead of prompting.
 
-`set-password` and `delete-user` exit non-zero and change nothing when the
-named account does not exist.
+`set-password`, `set-personnel-number`, and `delete-user` exit non-zero and
+change nothing when the named account does not exist.
+`set-personnel-number` also refuses a malformed number or one held by another
+account.
 
 ### Use a different database file
 

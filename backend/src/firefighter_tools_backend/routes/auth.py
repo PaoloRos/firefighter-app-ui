@@ -30,6 +30,7 @@ def _session_user(user: User) -> SessionUser:
         rank=user.rank,
         zug=user.zug,
         gruppe=user.gruppe,
+        personnel_number=user.personnel_number,
     )
 
 

@@ -1211,3 +1211,54 @@ This task also absorbed an unrelated change the project owner made to `assets/ex
 3. Run the same command without `--participant` and with `--output all.ics`. Confirm all 4 events are converted and no `Participant:` line appears.
 4. Run `$P/.venv/bin/python $P/main.py --help` and confirm the `-p, --participant ID` option is listed.
 5. When satisfied, publish the tag yourself from the library repository with `git push origin main v0.3.0`.
+
+### TASK-045 - Introduce Alembic and a personnel number on accounts
+
+**Ask:** Introduce Alembic with a baseline revision for the current schema, add an optional unique `personnel_number` to accounts through a migration that keeps existing accounts, expose it in `/api/v1/auth/me`, and manage it with `create-user --personnel-number` and a new `set-personnel-number` CLI command.
+
+**Answer:**
+- **Alembic setup:** added `alembic>=1.16,<2` (1.20.0 installed) and a migrations package in `backend/src/firefighter_tools_backend/db/migrations/`: `env.py`, `script.py.mako`, and the revisions below.
+  - The configuration is built in code by the new `db/schema.py`, so the database URL always comes from the application settings and no `alembic.ini` is needed.
+  - The migration files are declared as package data in `backend/pyproject.toml`.
+- **Revisions:**
+  - `0001_baseline` reproduces the schema `Base.metadata.create_all` built before migrations. That DDL was captured from the models and matched against the existing `data/firefighter.db` before anything changed.
+  - `0002_personnel_number` adds a nullable `users.personnel_number` (`String(50)`) plus a unique index, `ix_users_personnel_number`. SQLite cannot add a column carrying a UNIQUE constraint, and a unique index allows any number of accounts without a number.
+- **`init_db()`** now calls `upgrade_schema(engine)` instead of `create_all`. A database with a `users` table but no `alembic_version` table (a pre-migration database) is first stamped at the baseline and then upgraded in place, so its accounts are kept. Every existing caller works unchanged: app startup and all CLI commands.
+- **Validation:**
+  - The number carries through `UserRecord`, the domain `User`, the repository, the `SessionUser` API contract, and login and `/me`.
+  - The new `parse_personnel_number` strips it and requires 1–50 letters, digits, `.`, `_` or `-`. That excludes the schedule's `;`/`,` separators and every path character.
+  - The auth service rejects a number held by another account with a typed `PersonnelNumberError` (`invalid_personnel_number` or `personnel_number_taken`). An account may keep its own number.
+- **CLI:**
+  - `create-user` gained `--personnel-number` and checks a malformed number before prompting for the password.
+  - The new `set-personnel-number --username U (--personnel-number N | --clear)` requires exactly one of the two options.
+  - `list-users` shows `personnel_number=` first among the profile fields.
+  - A malformed or taken number, or an unknown account, exits 1 with a clear message and changes nothing.
+- **Tests:**
+  - The shared `conftest.py` fixture now builds each test database through `init_db()` rather than `create_all`, so the whole backend suite runs on the migrated schema. Run time is unchanged at about 3.5 s.
+  - The new `test_migrations.py` covers: a legacy `create_all` database upgraded with its rows kept, a fresh migration matching `Base.metadata` exactly (Alembic `compare_metadata` reports no differences), repeated upgrades being a no-op, and uniqueness with multiple NULLs allowed.
+  - The CLI and auth tests cover every new path. The frontend is unchanged: its session guard already ignores extra fields, and the typed `personnel_number` belongs to the per-person conversion task.
+- **Docs:** `PLAN.md` and `README.md` are updated. The note calling the next `active_schedule` change the trigger for Alembic is replaced.
+- **Verification:**
+  - `make test` passed end to end: backend 163 (up from 147), frontend 113, integration 10, e2e 15, and verify.
+  - `git diff --check` is clean.
+  - The demo was rehearsed on a scratch copy of the real database (all CLI paths, plus login and `/me` returning `personnel_number` on a loopback server), and `make run` was started and checked.
+- **Real database:** `scripts/verify.py` imports the backend, and `main.py` builds the app at import time, so `make test` itself migrated the real `data/firefighter.db` before a backup could be taken. The result is the same one-time upgrade that the first `make run` would perform: the database is now at `0002_personnel_number`, and all 3 accounts are intact with an empty personnel number. A rehearsal on a copy taken before the upgrade had shown the same outcome.
+
+**Automated test:**
+
+1. From the repository root, run `make test-backend` and confirm 163 tests pass, including the 4 in `backend/tests/test_migrations.py`.
+2. Run `make test` and confirm the backend (163), frontend (113), integration (10), Playwright e2e (15), and verify stages all pass.
+3. Run `git diff --check` and confirm that it produces no output.
+
+**Developer demo:**
+
+1. From the repository root, run `sqlite3 -readonly data/firefighter.db "select version_num from alembic_version"` and confirm `0002_personnel_number`. Then run `backend/.venv/bin/python -m firefighter_tools_backend list-users` and confirm every existing account is still listed.
+2. Run `backend/.venv/bin/python -m firefighter_tools_backend set-personnel-number --username <your account> --personnel-number 101`, confirm `Set the personnel number of '<your account>' to '101'.`, and confirm that `list-users` now shows `personnel_number=101` for that account.
+3. Try the refusals:
+   - Assign `101` to a second account: expect `Personnel number '101' already belongs to another account.`
+   - Run `create-user --username x --personnel-number "101;204"`: expect `A personnel number must be 1-50 letters, digits, '.', '_' or '-'.` without a password prompt.
+   - Name an unknown `--username`: expect `User '…' does not exist.`
+   - Each exits non-zero and changes nothing.
+4. Start the application with `make run`. Sign in at `http://127.0.0.1:8000` with the numbered account, then open `http://127.0.0.1:8000/api/v1/auth/me` in the same browser and confirm the JSON includes `"personnel_number":"101"`. Signed out, the same URL returns `not_authenticated`.
+5. Open `http://127.0.0.1:8000/docs` and confirm that the `SessionUser` schema lists `personnel_number`.
+6. Optionally, run `set-personnel-number --username <your account> --clear` and confirm `list-users` no longer shows the number.

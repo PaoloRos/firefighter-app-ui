@@ -17,6 +17,7 @@ from collections.abc import Generator  # noqa: E402
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
+from sqlalchemy import text  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 
 from firefighter_tools_backend import create_app  # noqa: E402
@@ -24,6 +25,7 @@ from firefighter_tools_backend.db import (  # noqa: E402
     Base,
     SessionLocal,
     engine,
+    init_db,
 )
 from firefighter_tools_backend.dependencies import get_current_user  # noqa: E402
 from firefighter_tools_backend.domain.user import Role, User  # noqa: E402
@@ -35,11 +37,21 @@ PLAIN_USER = User(id=2, username="member", role=Role.USER, name="Member")
 
 @pytest.fixture(autouse=True)
 def fresh_database() -> Generator[None]:
-    """Recreate every table before each test and drop it afterwards."""
-    Base.metadata.drop_all(engine)
-    Base.metadata.create_all(engine)
+    """Migrate an empty database before each test and drop it afterwards.
+
+    Building the schema through ``init_db`` rather than ``create_all`` makes
+    every test run against the migrated schema the application really uses.
+    """
+    _drop_database()
+    init_db()
     yield
+    _drop_database()
+
+
+def _drop_database() -> None:
     Base.metadata.drop_all(engine)
+    with engine.begin() as connection:
+        connection.execute(text("DROP TABLE IF EXISTS alembic_version"))
 
 
 @pytest.fixture(autouse=True)

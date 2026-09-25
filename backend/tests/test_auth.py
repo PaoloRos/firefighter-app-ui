@@ -1,11 +1,16 @@
 """Authentication, session, and role-authorization tests."""
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from firefighter_tools_backend.db.models import UserRecord
-from firefighter_tools_backend.domain.user import Role
+from firefighter_tools_backend.domain.user import (
+    PersonnelNumberError,
+    PersonnelNumberErrorCode,
+    Role,
+)
 from firefighter_tools_backend.services import auth
 
 CONVERT_ENDPOINT = "/api/v1/tools/calendar-converter/convert"
@@ -22,6 +27,7 @@ def _seed_user(
     username: str = "chief",
     password: str = "correct horse",
     role: Role = Role.SUPER_USER,
+    personnel_number: str | None = None,
 ) -> None:
     auth.create_user(
         session,
@@ -29,6 +35,7 @@ def _seed_user(
         password=password,
         role=role,
         profile={"name": "Chief", "surname": "Fireperson", "zug": "1"},
+        personnel_number=personnel_number,
     )
 
 
@@ -65,6 +72,7 @@ def test_login_starts_a_session_and_returns_the_safe_profile(
         "rank": None,
         "zug": "1",
         "gruppe": None,
+        "personnel_number": None,
     }
     assert "password" not in body
     assert "firefighter_tools_session" in response.headers.get("set-cookie", "")
@@ -132,6 +140,41 @@ def test_login_then_me_then_logout_round_trip(
     assert logout.status_code == 204
 
     assert anonymous_client.get("/api/v1/auth/me").status_code == 401
+
+
+def test_me_exposes_the_accounts_own_personnel_number(
+    anonymous_client: TestClient,
+    db_session: Session,
+) -> None:
+    _seed_user(
+        db_session,
+        username="member",
+        password="pw",
+        role=Role.USER,
+        personnel_number="204",
+    )
+
+    login = anonymous_client.post(
+        "/api/v1/auth/login",
+        json={"username": "member", "password": "pw"},
+    )
+    me = anonymous_client.get("/api/v1/auth/me")
+
+    assert login.json()["personnel_number"] == "204"
+    assert me.status_code == 200
+    assert me.json()["personnel_number"] == "204"
+
+
+def test_create_user_refuses_a_personnel_number_already_assigned(
+    db_session: Session,
+) -> None:
+    _seed_user(db_session, username="chief", personnel_number="101")
+
+    with pytest.raises(PersonnelNumberError) as raised:
+        _seed_user(db_session, username="member", personnel_number="101")
+
+    assert raised.value.code is PersonnelNumberErrorCode.TAKEN
+    assert len(db_session.scalars(select(UserRecord)).all()) == 1
 
 
 def test_logout_is_safe_without_a_session(

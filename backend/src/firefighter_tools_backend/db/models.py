@@ -31,6 +31,12 @@ class UserRecord(Base):
     rank: Mapped[str | None] = mapped_column(String(100), default=None)
     zug: Mapped[str | None] = mapped_column(String(100), default=None)
     gruppe: Mapped[str | None] = mapped_column(String(100), default=None)
+    personnel_number: Mapped[str | None] = mapped_column(
+        String(50),
+        unique=True,
+        index=True,
+        default=None,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=_utcnow,

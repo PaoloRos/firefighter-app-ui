@@ -8,6 +8,7 @@ version = "0.1.0"
 description = "Local API backend for Feuerwehr Tools"
 requires-python = ">=3.11"
 dependencies = [
+    "alembic>=1.16,<2",
     "calendar-conversion @ git+https://github.com/PaoloRos/calendar-conversion.git@v0.2.0",
     "fastapi>=0.139,<1.0",
     "itsdangerous>=2,<3",
@@ -29,3 +30,6 @@ testpaths = ["tests"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+"firefighter_tools_backend.db.migrations" = ["script.py.mako", "versions/*.py"]

@@ -108,12 +108,15 @@ React will create a `text/calendar;charset=utf-8` Blob from the returned ICS tex
 
 ### Users and access control
 
-Store accounts in a local SQLite database (`data/firefighter.db` by default, overridable with `FIREFIGHTER_TOOLS_DATABASE_URL`) through SQLAlchemy models kept separate from the Pydantic API contract. Each account has a `username`, a scrypt password hash (stdlib `hashlib.scrypt`, never logged), a `role` of `super_user` or `user`, and the firefighter profile fields `name`, `surname`, `rank`, `zug`, and `gruppe`.
+Store accounts in a local SQLite database (`data/firefighter.db` by default, overridable with `FIREFIGHTER_TOOLS_DATABASE_URL`) through SQLAlchemy models kept separate from the Pydantic API contract. Each account has a `username`, a scrypt password hash (stdlib `hashlib.scrypt`, never logged), a `role` of `super_user` or `user`, the firefighter profile fields `name`, `surname`, `rank`, `zug`, and `gruppe`, and an optional `personnel_number`.
+
+- The `personnel_number` is unique across accounts (a unique index, so any number of accounts may have none) and limited to 1–50 letters, digits, `.`, `_`, or `-`, so it can never contain a schedule's participant separators or a path character. It is the id a schedule's `participants` column refers to, and `GET /api/v1/auth/me` exposes it to its own account.
+- The schema is owned by Alembic migrations in `backend/src/firefighter_tools_backend/db/migrations/`, configured in code so the URL always comes from the application settings. Every process that opens the database (the server and each account command) upgrades it to the latest revision on start. Revision `0001_baseline` reproduces the schema `Base.metadata.create_all` built before migrations existed; a database from that era has no `alembic_version` table, so it is stamped at the baseline and then upgraded in place, keeping its accounts. `0002_personnel_number` adds the personnel number. Future schema changes are new revisions, never edits to `create_all`.
 
 - Authenticate with Starlette's signed session cookie (`itsdangerous`), keyed from `FIREFIGHTER_TOOLS_SECRET_KEY` with a development-only fallback. The cookie carries only the account id.
 - `POST /api/v1/auth/login` verifies credentials and starts the session; `POST /api/v1/auth/logout` clears it; `GET /api/v1/auth/me` returns the signed-in account without secrets. Failures use stable codes (`invalid_credentials`, `not_authenticated`, `forbidden`) and never expose tracebacks.
 - `super_user` accounts may upload schedules through the converter, replace the server-held active schedule, and download the example schedule that shows the required columns; every signed-in account may convert the active schedule and download the resulting calendar.
-- Create and manage accounts with the `python -m firefighter_tools_backend create-user` command; the database file and `.env` are git-ignored and never committed.
+- Create and manage accounts with the `python -m firefighter_tools_backend create-user` command (which accepts `--personnel-number`) and assign, replace, or clear a number with `set-personnel-number`; the database file and `.env` are git-ignored and never committed.
 - This does not change the deployment posture: the server still binds `127.0.0.1` only, and internet publication (TLS, rate limiting, session hardening) remains a separate later phase.
 
 ### Schedule store
@@ -126,7 +129,7 @@ The server holds exactly one active schedule, replaced rather than versioned.
 - The reverse failure self-heals: when the row names a file that no longer exists, the read path deletes the row and reports an empty store, so `GET .../schedule` and `POST .../schedule/convert` can never disagree.
 - SQLite does not preserve timezone offsets, so stored timestamps are re-attached to UTC when read.
 - Generated calendars are still never written to disk. `scripts/verify.py` asserts the default store stays under `data/`, holds no `.ics`, and contains only opaque `<uuid>.<csv|xlsx>` files.
-- Deleting the active schedule through the API, per-user filtering of commitments, and schedule history are future work. The next schema change to `active_schedule` is the trigger for introducing Alembic, since the MVP relies on `Base.metadata.create_all`.
+- Deleting the active schedule through the API, per-user filtering of commitments, and schedule history are future work. Any schema change they need is a new Alembic revision (see Users and access control).
 
 ## User Experience
 

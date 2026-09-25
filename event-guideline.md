@@ -14,5 +14,16 @@ The calendar reference is [taschenkalendar-2026.pdf](data/taschenkalendar-2026.p
 
 * only `atemschutztraeger`: **atemschutz** (20:00 - 21:00)
 
-* **sitzung** events only for: `ausschussmitglied`, `schriftfuehrer`, `kassier`, `geraewart`, `KDT`, `KDT-STV`, `ZKDT`, `GKDT`
+* **sitzung** (20:00 - 21:00) events only for: `ausschussmitglied`, `schriftfuehrer`, `kassier`, `geraewart`, `KDT`, `KDT-STV`, `ZKDT`, `GKDT`
+
+* background colour of each event's whole row in the .xlsx (light shades, so the text stays readable):
+
+  | Event | Colour | Hex |
+  |---|---|---|
+  | **uebung** | blue | `BDD7EE` |
+  | **atemschutz** | green | `C6E0B4` |
+  | **sitzung** | yellow | `FFF2A8` |
+  | **weihnachtsfeier** | red | `F4B6B6` |
+
+  Other rows, such as the night shifts, keep no background.
 

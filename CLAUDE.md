@@ -15,6 +15,13 @@ When asked to plan the work described in `TODO.md`, use the `/ai-plan` skill
 replacing the previous contents, and stops there — planning never edits code or
 queues a task.
 
+When asked to create or regenerate the event plan, use the `/event-plan` skill
+(`.claude/skills/event-plan/SKILL.md`). It follows the rules in
+`event-guideline.md`, reads the Taschenkalender and the member list, writes the
+`.xlsx` schedule the calendar converter accepts, colours each event kind's rows
+as the guideline specifies (uebung blue, atemschutz green, sitzung yellow,
+weihnachtsfeier red), and verifies it with the converter.
+
 ## Commits
 
 Every commit you create must end with a blank line followed by a co-author

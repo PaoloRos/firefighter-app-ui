@@ -30,7 +30,15 @@ export type ApiErrorCode =
   | "malformed_xlsx"
   | "input_read_error"
   | "no_active_schedule"
+  | "missing_personnel_number"
   | "internal_error";
+
+/**
+ * Which events a conversion of the active schedule returns: `personal` keeps
+ * the signed-in account's events plus the events for everyone, `full` returns
+ * the whole schedule and is reserved for a super-user.
+ */
+export type ConversionScope = "personal" | "full";
 
 export type ConverterIssueCode =
   | "empty_id"
@@ -108,6 +116,7 @@ const apiErrorCodes = new Set<ApiErrorCode>([
   "malformed_xlsx",
   "input_read_error",
   "no_active_schedule",
+  "missing_personnel_number",
   "internal_error",
 ]);
 
@@ -299,9 +308,11 @@ export async function uploadActiveSchedule(
 }
 
 export async function convertActiveSchedule(
-  options: ConvertCalendarOptions = {},
+  options: ConvertCalendarOptions & { scope?: ConversionScope } = {},
 ): Promise<CalendarConverterResult> {
-  const httpResponse = await fetch(ACTIVE_SCHEDULE_CONVERT_ENDPOINT, {
+  const scope = options.scope ?? "personal";
+  const endpoint = `${ACTIVE_SCHEDULE_CONVERT_ENDPOINT}?scope=${scope}`;
+  const httpResponse = await fetch(endpoint, {
     method: "POST",
     signal: options.signal,
   });

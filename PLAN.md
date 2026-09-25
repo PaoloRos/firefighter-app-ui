@@ -83,7 +83,9 @@ convert_schedule(
 
 `ConversionResult` exposes ICS text, total/converted/skipped counts, and invalid events. Each invalid event includes its source position, ID, summary, and structured issue codes. Fatal input errors expose a stable code plus optional row and worksheet locations.
 
-Preserve the converter’s existing CLI behavior and exit codes by making the CLI call this new service. Pin the backend to the `calendar-conversion` `v0.2.0` Git tag; allow an editable sibling checkout during development.
+Preserve the converter’s existing CLI behavior and exit codes by making the CLI call this new service. Pin the backend to the `calendar-conversion` `v0.3.0` Git tag; allow an editable sibling checkout during development.
+
+Since `v0.3.0` the library also reads an optional `participants` column (ids separated by `;` or `,`; an empty cell or a missing column means everyone) and `convert_schedule` accepts an optional `participant`. It validates the whole schedule first, so duplicate IDs are caught across people, then keeps only that person's events plus the events for everyone; the counts and invalid events describe only the kept events. The filter lives in the library so the CLI (`--participant`) and the web backend cannot disagree about who receives which event.
 
 ### Web API
 
@@ -103,6 +105,9 @@ Three further endpoints operate on the server-held schedule:
 - `PUT /api/v1/tools/calendar-converter/schedule` accepts one multipart `file` from a `super_user` and replaces the active schedule. It reuses the same validation as `.../convert` (extension allow-list, 10 MiB ceiling, filename sanitization) and returns the stored schedule's public metadata.
 - `GET /api/v1/tools/calendar-converter/schedule` returns that metadata to any signed-in account, or `{"schedule": null}` when nothing is stored. An empty store is a normal state, not an error.
 - `POST /api/v1/tools/calendar-converter/schedule/convert` converts the stored schedule for any signed-in account and returns the same `ConversionResponse` contract as `.../convert`. It returns `409` with the stable `no_active_schedule` code when the store is empty.
+  - The `scope` query parameter selects the events. `personal`, the default, matches the account's `personnel_number` against the `participants` column and keeps that person's events plus the events for everyone; the calendar is named `<stem>-<personnel_number>.ics`. `full` returns the whole schedule named `<stem>.ics` and is reserved for a `super_user`; a plain `user` gets `403 forbidden`.
+  - A personal conversion for an account without a personnel number returns `409` with the stable `missing_personnel_number` code rather than silently returning only the events for everyone.
+  - A personal conversion that matches no event is a normal outcome: `failure` with `total_count` `0` and no calendar, which the interface presents as "no events for you" rather than as an error.
 
 React will create a `text/calendar;charset=utf-8` Blob from the returned ICS text and initiate the download locally.
 
@@ -115,7 +120,7 @@ Store accounts in a local SQLite database (`data/firefighter.db` by default, ove
 
 - Authenticate with Starlette's signed session cookie (`itsdangerous`), keyed from `FIREFIGHTER_TOOLS_SECRET_KEY` with a development-only fallback. The cookie carries only the account id.
 - `POST /api/v1/auth/login` verifies credentials and starts the session; `POST /api/v1/auth/logout` clears it; `GET /api/v1/auth/me` returns the signed-in account without secrets. Failures use stable codes (`invalid_credentials`, `not_authenticated`, `forbidden`) and never expose tracebacks.
-- `super_user` accounts may upload schedules through the converter, replace the server-held active schedule, and download the example schedule that shows the required columns; every signed-in account may convert the active schedule and download the resulting calendar.
+- `super_user` accounts may upload schedules through the converter, replace the server-held active schedule, and download the example schedule that shows the required columns; every signed-in account may convert the active schedule and download its personal calendar, and a `super_user` may also convert the full schedule to review every event and problem.
 - Create and manage accounts with the `python -m firefighter_tools_backend create-user` command (which accepts `--personnel-number`) and assign, replace, or clear a number with `set-personnel-number`; the database file and `.env` are git-ignored and never committed.
 - This does not change the deployment posture: the server still binds `127.0.0.1` only, and internet publication (TLS, rate limiting, session hardening) remains a separate later phase.
 
@@ -129,7 +134,7 @@ The server holds exactly one active schedule, replaced rather than versioned.
 - The reverse failure self-heals: when the row names a file that no longer exists, the read path deletes the row and reports an empty store, so `GET .../schedule` and `POST .../schedule/convert` can never disagree.
 - SQLite does not preserve timezone offsets, so stored timestamps are re-attached to UTC when read.
 - Generated calendars are still never written to disk. `scripts/verify.py` asserts the default store stays under `data/`, holds no `.ics`, and contains only opaque `<uuid>.<csv|xlsx>` files.
-- Deleting the active schedule through the API, per-user filtering of commitments, and schedule history are future work. Any schema change they need is a new Alembic revision (see Users and access control).
+- Per-person calendars are selected at conversion time from the stored schedule's `participants` column; nothing per person is stored. Deleting the active schedule through the API, a warning for participant ids that match no account, and schedule history are future work. Any schema change they need is a new Alembic revision (see Users and access control).
 
 ## User Experience
 
@@ -141,7 +146,8 @@ The server holds exactly one active schedule, replaced rather than versioned.
 - Give the converter five explicit states: idle, file selected, converting, success/partial result, and fatal error.
 - Support both file picker and drag-and-drop, while keeping the picker fully usable by keyboard and touch.
 - Explain accepted formats and the three-step workflow beside the upload control.
-- Include one version-controlled example XLSX schedule using the converter’s required columns.
+- Include one version-controlled example XLSX schedule using the converter’s required columns and the optional `participants` column, with events for everyone, for several people, and for one person.
+- Give a `super_user` a "Nur meine Termine" / "Solo i miei impegni" switch that converts their own calendar instead of the full schedule; it is disabled with an explanation when their account has no personnel number. A plain `user` always receives their own calendar, and one without a personnel number sees why the conversion is unavailable.
 - On partial conversion, prominently explain that invalid events were skipped, list each skipped event and its problems, and retain the ICS download button.
 - If all events are invalid, show the problems but offer no empty calendar download.
 - Prevent duplicate submissions and provide clear reset/choose-another-file actions.
@@ -190,10 +196,10 @@ flowchart TD
 
 - Converter tests cover valid CSV/XLSX, partial conversion, all-invalid input, malformed rows, duplicate IDs, unsupported extensions, and unchanged CLI exit/report behavior.
 - API tests cover success, partial and failure payloads, 10 MiB enforcement, malformed uploads, filename sanitization, Unicode, and the absence of any retained generated calendar.
-- Schedule-store tests cover opaque stored names, replacement that purges the previous file, a failed commit that removes the new file, orphan purging, a self-healing row whose file disappeared, traversal filenames that cannot escape the store, and the `409 no_active_schedule` contract.
+- Schedule-store tests cover opaque stored names, replacement that purges the previous file, a failed commit that removes the new file, orphan purging, a self-healing row whose file disappeared, traversal filenames that cannot escape the store, and the `409 no_active_schedule` contract. Per-person tests cover personal filtering, shared and everyone events, the full scope and its `403` for a plain user, `409 missing_personnel_number`, an empty personal result, and hiding other people's invalid events.
 - Authentication tests cover login success and failure, session `me`/logout, scrypt hashing that never stores plaintext, `401` for unauthenticated conversion, and `403` for a plain `user`. `GET .../example` stays open to any signed-in account, but the interface offers it only to a `super_user`, because a plain account never supplies a source file.
 - Frontend tests cover routing, both languages, upload validation, state transitions, issue rendering, partial download, reset behavior, and persisted language choice.
-- End-to-end tests cover dashboard-to-download flows for valid, partially valid, malformed, and all-invalid sample files.
+- End-to-end tests cover dashboard-to-download flows for valid, partially valid, malformed, and all-invalid sample files, and per-person downloads for a `super_user` (full and own), a plain `user`, and an account without a personnel number.
 - Accessibility checks cover keyboard-only use, focus order, semantic labels, screen-reader announcements, contrast, zoom, and phone-sized layouts.
 - The downloaded ICS must contain only valid events and import successfully into a mainstream calendar application.
 - The final local build must start through the documented command, remain accessible only from the same computer, and require no internet connection after dependencies are installed.

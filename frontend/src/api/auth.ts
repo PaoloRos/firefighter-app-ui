@@ -17,6 +17,7 @@ export type SessionUser = {
   rank: string | null;
   zug: string | null;
   gruppe: string | null;
+  personnel_number: string | null;
 };
 
 export type AuthErrorResponse = {
@@ -114,7 +115,8 @@ function isSessionUser(value: unknown): value is SessionUser {
     isNullableString(value.surname) &&
     isNullableString(value.rank) &&
     isNullableString(value.zug) &&
-    isNullableString(value.gruppe)
+    isNullableString(value.gruppe) &&
+    isNullableString(value.personnel_number)
   );
 }
 

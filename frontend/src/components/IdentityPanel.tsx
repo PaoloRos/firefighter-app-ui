@@ -4,7 +4,8 @@ import { presentRank } from "./rankPresentation";
 
 /**
  * Home-page panel that shows the signed-in firefighter: the account name, the
- * full name in capitals, and the rank / Zug / Gruppe as soft-background tags.
+ * full name in capitals, and the rank / Zug / Gruppe / personnel number as
+ * soft-background tags.
  * The rank tag is colour-coded by seniority (see {@link presentRank}).
  */
 export function IdentityPanel() {
@@ -22,7 +23,9 @@ export function IdentityPanel() {
   const rank = user.rank ? presentRank(user.rank) : null;
   const zug = user.zug?.trim() ?? "";
   const gruppe = user.gruppe?.trim() ?? "";
-  const hasTags = rank !== null || zug !== "" || gruppe !== "";
+  const personnelNumber = user.personnel_number?.trim() ?? "";
+  const hasTags =
+    rank !== null || zug !== "" || gruppe !== "" || personnelNumber !== "";
 
   return (
     <section className="panel identity-panel" aria-labelledby="identity-heading">
@@ -61,6 +64,11 @@ export function IdentityPanel() {
           {gruppe !== "" ? (
             <li className="identity-tag">
               {t("identityGruppeLabel")} {gruppe}
+            </li>
+          ) : null}
+          {personnelNumber !== "" ? (
+            <li className="identity-tag identity-tag-personnel-number">
+              {t("identityPersonnelNumberLabel")} {personnelNumber}
             </li>
           ) : null}
         </ul>

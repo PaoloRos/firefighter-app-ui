@@ -2,7 +2,7 @@
 
 from pathlib import Path, PurePath
 
-from fastapi import APIRouter, Depends, File, UploadFile, status
+from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy.orm import Session
 
@@ -25,13 +25,19 @@ from firefighter_tools_backend.domain.upload import (
     UploadValidationError,
     UploadValidationErrorCode,
 )
-from firefighter_tools_backend.domain.user import User
+from firefighter_tools_backend.domain.user import (
+    AuthError,
+    AuthErrorCode,
+    Role,
+    User,
+)
 from firefighter_tools_backend.models.auth import AuthErrorResponse
 from firefighter_tools_backend.models.calendar_conversion import (
     ActiveSchedule,
     ActiveScheduleResponse,
     Calendar,
     ConversionResponse,
+    ConversionScope,
     ConversionStatus,
     FatalErrorCode,
     FatalErrorResponse,
@@ -111,6 +117,12 @@ _STORE_ERRORS = {
         "The request could not be processed.",
     ),
 }
+
+_MISSING_PERSONNEL_NUMBER = (
+    status.HTTP_409_CONFLICT,
+    FatalErrorCode.MISSING_PERSONNEL_NUMBER,
+    "This account has no personnel number.",
+)
 
 
 @router.get(
@@ -193,6 +205,7 @@ def read_active_schedule(
     response_model=ConversionResponse,
     responses={
         401: {"model": AuthErrorResponse},
+        403: {"model": AuthErrorResponse},
         409: {"model": FatalErrorResponse},
         415: {"model": FatalErrorResponse},
         422: {"model": FatalErrorResponse},
@@ -200,20 +213,43 @@ def read_active_schedule(
     },
 )
 def convert_active_schedule(
-    _: User = Depends(get_current_user),
+    scope: ConversionScope = Query(
+        ConversionScope.PERSONAL,
+        description=(
+            "`personal` returns the caller's events plus the events for "
+            "everyone; `full` returns the whole schedule (super-user only)."
+        ),
+    ),
+    current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db),
 ) -> ConversionResponse | JSONResponse:
-    """Convert the stored schedule for any signed-in account."""
+    """Convert the stored schedule for the signed-in account.
+
+    A personal conversion matches the account's personnel number against the
+    schedule's ``participants`` column, so an account without a number is
+    refused rather than silently given only the events for everyone.
+    """
+    if scope is ConversionScope.FULL:
+        if current_user.role is not Role.SUPER_USER:
+            raise AuthError(AuthErrorCode.FORBIDDEN)
+        participant = None
+    else:
+        participant = current_user.personnel_number
+        if participant is None:
+            return _fatal_response(*_MISSING_PERSONNEL_NUMBER)
+
     try:
         schedule = schedule_store.load_active_schedule(session)
         with schedule_store.open_active_schedule(schedule) as source:
             result = calendar_conversion.convert_calendar(
                 source,
                 filename=schedule.original_filename,
+                participant=participant,
             )
         return _conversion_response(
             result,
             source_filename=schedule.original_filename,
+            filename_suffix=participant,
         )
     except ScheduleStoreError as error:
         return _fatal_response(*_STORE_ERRORS[error.code])
@@ -272,6 +308,7 @@ def _conversion_response(
     result: ConversionResult,
     *,
     source_filename: str,
+    filename_suffix: str | None = None,
 ) -> ConversionResponse:
     if result.converted_count == 0:
         conversion_status = ConversionStatus.FAILURE
@@ -282,8 +319,12 @@ def _conversion_response(
             if result.skipped_count
             else ConversionStatus.SUCCESS
         )
+        # A personnel number is restricted to filename-safe characters.
+        stem = PurePath(source_filename).stem
+        if filename_suffix is not None:
+            stem = f"{stem}-{filename_suffix}"
         calendar = Calendar(
-            filename=f"{PurePath(source_filename).stem}.ics",
+            filename=f"{stem}.ics",
             ics_text=result.ics_text,
         )
 

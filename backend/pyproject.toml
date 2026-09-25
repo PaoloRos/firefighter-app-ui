@@ -9,7 +9,7 @@ description = "Local API backend for Feuerwehr Tools"
 requires-python = ">=3.11"
 dependencies = [
     "alembic>=1.16,<2",
-    "calendar-conversion @ git+https://github.com/PaoloRos/calendar-conversion.git@v0.2.0",
+    "calendar-conversion @ git+https://github.com/PaoloRos/calendar-conversion.git@v0.3.0",
     "fastapi>=0.139,<1.0",
     "itsdangerous>=2,<3",
     "python-multipart>=0.0.20,<1.0",

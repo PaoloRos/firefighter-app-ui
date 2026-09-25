@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   ACTIVE_SCHEDULE_ENDPOINT,
+  ACTIVE_SCHEDULE_CONVERT_ENDPOINT,
   CALENDAR_CONVERTER_ENDPOINT,
   CalendarConverterContractError,
   convertActiveSchedule,
@@ -344,6 +345,53 @@ describe("active schedule API client", () => {
     expect(requestInit?.method).toBe("POST");
     expect(requestInit?.body).toBeUndefined();
     expect(result).toEqual({ ok: true, response: successResponse });
+  });
+
+  it("asks for the personal scope unless the full schedule is requested", async () => {
+    const requested: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        requested.push(String(input));
+        return jsonResponse(successResponse);
+      }),
+    );
+
+    await convertActiveSchedule();
+    await convertActiveSchedule({ scope: "personal" });
+    await convertActiveSchedule({ scope: "full" });
+
+    expect(requested).toEqual([
+      `${ACTIVE_SCHEDULE_CONVERT_ENDPOINT}?scope=personal`,
+      `${ACTIVE_SCHEDULE_CONVERT_ENDPOINT}?scope=personal`,
+      `${ACTIVE_SCHEDULE_CONVERT_ENDPOINT}?scope=full`,
+    ]);
+  });
+
+  it("surfaces a 409 missing_personnel_number as a typed error", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        jsonResponse(
+          {
+            code: "missing_personnel_number",
+            message: "This account has no personnel number.",
+          },
+          409,
+        ),
+      ),
+    );
+
+    const result = await convertActiveSchedule();
+
+    expect(result).toEqual({
+      ok: false,
+      status: 409,
+      error: {
+        code: "missing_personnel_number",
+        message: "This account has no personnel number.",
+      },
+    });
   });
 
   it("surfaces a 409 no_active_schedule as a typed error, not a throw", async () => {

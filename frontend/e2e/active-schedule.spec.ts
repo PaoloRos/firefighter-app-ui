@@ -50,7 +50,10 @@ test("a super-user publishes a schedule that a plain user converts", async ({
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Kalender herunterladen" }).click();
   const download = await downloadPromise;
-  expect(download.suggestedFilename()).toBe("partial.ics");
+  // A plain user's calendar is personal, so it is named after their number.
+  expect(download.suggestedFilename()).toBe(
+    `partial-${E2E_PLAIN_USER.personnelNumber}.ics`,
+  );
 });
 
 test("replacing the schedule changes what every account sees", async ({

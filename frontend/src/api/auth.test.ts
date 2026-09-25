@@ -19,6 +19,7 @@ const superUser: SessionUser = {
   rank: null,
   zug: null,
   gruppe: null,
+  personnel_number: null,
 };
 
 afterEach(() => {
@@ -86,6 +87,22 @@ describe("auth API client", () => {
 
     await expect(fetchCurrentUser()).resolves.toEqual(superUser);
     expect(requestInput).toBe(AUTH_ME_ENDPOINT);
+  });
+
+  it("reads the account's own personnel number from the me endpoint", async () => {
+    const numbered: SessionUser = { ...superUser, personnel_number: "101" };
+    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse(numbered)));
+
+    await expect(fetchCurrentUser()).resolves.toEqual(numbered);
+  });
+
+  it("rejects a personnel number that is not a string", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => jsonResponse({ ...superUser, personnel_number: 101 })),
+    );
+
+    await expect(fetchCurrentUser()).rejects.toBeInstanceOf(AuthContractError);
   });
 
   it("treats a 401 from the me endpoint as an anonymous session", async () => {

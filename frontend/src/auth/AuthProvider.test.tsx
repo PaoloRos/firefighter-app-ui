@@ -27,6 +27,7 @@ const superUser: SessionUser = {
   rank: null,
   zug: null,
   gruppe: null,
+  personnel_number: null,
 };
 
 function Probe() {

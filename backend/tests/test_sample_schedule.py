@@ -1,6 +1,6 @@
 """Verification for the version-controlled XLSX sample schedule."""
 
-from datetime import date, datetime
+from datetime import date, datetime, time
 from importlib.metadata import version
 from pathlib import Path
 
@@ -27,8 +27,13 @@ EXPECTED_COLUMNS = [
     "end_time",
     "location",
     "description",
+    "participants",
 ]
-EXPECTED_IDS = ["dienst-2026-08-08"]
+EXPECTED_IDS = [
+    "dienst-2026-08-08",
+    "uebung-2026-08-12",
+    "nachtdienst-2026-08-15",
+]
 
 
 def test_sample_is_small_and_stored_in_application_assets() -> None:
@@ -40,7 +45,7 @@ def test_sample_is_small_and_stored_in_application_assets() -> None:
     assert ASSET_PATH.stat().st_size < 100 * 1024
 
 
-def test_sample_uses_exact_v020_columns_and_native_cell_types() -> None:
+def test_sample_uses_exact_v030_columns_and_native_cell_types() -> None:
     workbook = load_workbook(ASSET_PATH, data_only=True)
     try:
         assert workbook.sheetnames == ["Beispiel"]
@@ -56,15 +61,32 @@ def test_sample_uses_exact_v020_columns_and_native_cell_types() -> None:
     assert all(isinstance(row[3], (date, datetime)) for row in rows[1:])
     assert all(isinstance(row[5], (date, datetime)) for row in rows[1:])
 
-    # The sample is a single all-day entry: the flag is set and both time
-    # cells are genuinely empty rather than a zero time.
-    assert [row[2] for row in rows[1:]] == [True]
-    assert [row[4] for row in rows[1:]] == [None]
-    assert [row[6] for row in rows[1:]] == [None]
+    # The all-day entry leaves both time cells genuinely empty rather than a
+    # zero time; the timed entries carry native time cells.
+    assert [row[2] for row in rows[1:]] == [True, False, False]
+    assert [row[4] for row in rows[1:]] == [None, time(19, 0), time(22, 0)]
+    assert [row[6] for row in rows[1:]] == [None, time(21, 0), time(7, 0)]
+
+    # One event for everyone (empty cell), one shared, one personal.
+    assert [row[9] for row in rows[1:]] == [None, "101;204", "204"]
 
 
-def test_sample_converts_all_events_with_calendar_conversion_v020() -> None:
-    assert version("calendar-conversion") == "0.2.0"
+def test_sample_personal_conversion_keeps_only_that_persons_events() -> None:
+    with ASSET_PATH.open("rb") as source:
+        result = convert_calendar(
+            source,
+            filename=ASSET_PATH.name,
+            participant="101",
+        )
+
+    assert result.total_count == 2
+    assert "UID:dienst-2026-08-08" in result.ics_text
+    assert "UID:uebung-2026-08-12" in result.ics_text
+    assert "UID:nachtdienst-2026-08-15" not in result.ics_text
+
+
+def test_sample_converts_all_events_with_calendar_conversion_v030() -> None:
+    assert version("calendar-conversion") == "0.3.0"
 
     with ASSET_PATH.open("rb") as source:
         result = convert_calendar(source, filename=ASSET_PATH.name)

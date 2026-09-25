@@ -1262,3 +1262,51 @@ This task also absorbed an unrelated change the project owner made to `assets/ex
 4. Start the application with `make run`. Sign in at `http://127.0.0.1:8000` with the numbered account, then open `http://127.0.0.1:8000/api/v1/auth/me` in the same browser and confirm the JSON includes `"personnel_number":"101"`. Signed out, the same URL returns `not_authenticated`.
 5. Open `http://127.0.0.1:8000/docs` and confirm that the `SessionUser` schema lists `personnel_number`.
 6. Optionally, run `set-personnel-number --username <your account> --clear` and confirm `list-users` no longer shows the number.
+
+### TASK-046 - Convert the active schedule per personnel number
+
+**Ask:** Pin calendar-conversion `v0.3.0` and make `POST /api/v1/tools/calendar-converter/schedule/convert` return only the caller's events by personnel number, with a super_user-only `scope=full`; block personal conversion with `409 missing_personnel_number` when the account has no number; give the super_user a "Nur meine Termine" toggle, show a clear message when a user has no events, add the `participants` column to the example schedule, and update German/Italian texts, tests and PLAN.md.
+
+**Answer:**
+- **Library pin:** `backend/pyproject.toml` now requires `calendar-conversion` from the GitHub tag `v0.3.0`, installed from GitHub. The version checks in `scripts/verify.py`, `test_sample_schedule.py` and `test_calendar_converter_boundaries.py` follow it.
+- **Backend:**
+  - The adapter and the `convert_calendar` service pass an optional `participant` through to the library.
+  - `POST …/schedule/convert` takes a `scope` query parameter (`ConversionScope`: `personal` by default, or `full`).
+  - `personal` uses the signed-in account's `personnel_number`, so the response holds that person's events plus the events for everyone, and the calendar is named `<stem>-<number>.ics`.
+  - `full` returns the whole schedule named `<stem>.ics`. A plain user asking for it gets `403 forbidden` through the existing auth error handler.
+  - A personal conversion without a number returns `409` with the new stable `FatalErrorCode` `missing_personnel_number`, which is documented in OpenAPI along with the new `403`.
+  - The stateless `POST …/convert` endpoint is unchanged.
+- **Frontend:**
+  - `convertActiveSchedule({ scope })` always sends `?scope=`. `missing_personnel_number` joins the `ApiErrorCode` union and its runtime set, and `SessionUser` gains `personnel_number` in both its type and its contract guard.
+  - A super_user gets a "Nur meine Termine" / "Solo i miei impegni" checkbox (44 px target). Unchecked, it converts the full schedule with every diagnostic; checked, it gives the personal download view. Changing it clears a shown result. It is disabled with an explanation when the account has no number.
+  - A plain user always converts personally. One without a number sees a warning notice and a disabled button, and the server enforces the same rule.
+  - `ConversionResultPanel` shows an empty personal result as a neutral "Keine Termine für Sie" / "Nessun impegno per te" state rather than as a failure.
+  - The identity panel shows the personnel number, and the help aside explains personal calendars to everyone and the `participants` column to a super_user.
+  - Ten German/Italian keys were added in lockstep.
+- **Example schedule:** `assets/examples/calendar_schedule_example.xlsx` gained a styled `participants` column and two timed events. It now holds an event for everyone, one for `101;204`, and one for `204`.
+- **Docs:** `PLAN.md` (library, Web API, access, schedule store, UX, and test plan) and the README (roles, workflow, troubleshooting, `v0.3.0`) are updated.
+- **Verification:**
+  - `make test` passed end to end: backend 175 (up from 163), frontend 131 (up from 113), integration 11 (up from 10), Playwright e2e 18 (up from 15), and verify reporting `calendar-conversion revision: v0.3.0`. `git diff --check` is clean.
+  - New backend tests cover personal filtering, the full scope, the `403`, the `409`, an empty personal result, hiding other people's invalid events, an unknown scope, and the sample's personal conversion.
+  - The e2e accounts now carry personnel numbers (`101`, `204`) plus a third account without one. The new `e2e/personal-calendar.spec.ts` downloads and inspects the full and personal calendars and checks the blocked account.
+  - Against a live loopback server with a scratch database, uploading the example XLSX and converting returned: 3 events for the super_user's full scope, 2 for its personal scope (`…-101.ics`), 3 for user `204` (`…-204.ics`), `403` for that user's full scope, and `409 missing_personnel_number` for an account without a number.
+  - The on-screen behaviour was verified through the Playwright suite rather than by hand.
+
+**Automated test:**
+
+1. From the repository root, run `make test-backend` and confirm 175 tests pass, including the per-person tests at the end of `backend/tests/test_active_schedule_endpoint.py`.
+2. Run `make test-frontend` and confirm 131 tests pass, including the `per-person calendars` block in `frontend/src/pages/CalendarConverterPage.test.tsx`.
+3. Run `make test-e2e` and confirm 18 tests pass, including the three in `frontend/e2e/personal-calendar.spec.ts`.
+4. Run `make test` and confirm the backend (175), frontend (131), integration (11), e2e (18), and verify stages all pass, with verify printing `calendar-conversion revision: v0.3.0`.
+5. Run `git diff --check` and confirm that it produces no output.
+
+**Developer demo:**
+
+1. Give your accounts personnel numbers, for example `backend/.venv/bin/python -m firefighter_tools_backend set-personnel-number --username <super_user> --personnel-number 101` and `… --username <user> --personnel-number 204`. Leave one plain account without a number.
+2. Start the application with `make run` and open `http://127.0.0.1:8000`.
+3. Sign in as the super_user and open the calendar converter. Upload `assets/examples/calendar_schedule_example.xlsx`.
+4. Click "Kalender erstellen" and confirm the full review: 3 events, and a download named `calendar_schedule_example.ics`.
+5. Tick "Nur meine Termine" and confirm the result clears. Convert again and confirm 2 events (`Bereitschaftsdienst` and `Atemschutzübung`, not `Nachtdienst`) and a download named `calendar_schedule_example-101.ics`.
+6. Sign in as the numbered user. Confirm there is no checkbox and that the home panel shows `Personalnummer 204`. Converting gives 3 events and `calendar_schedule_example-204.ics`.
+7. Sign in as the account without a number and confirm the warning ("Ihrem Konto ist keine Personalnummer zugeordnet …") and the disabled "Kalender erstellen" button. Switch to Italiano and confirm the Italian texts, including "Solo i miei impegni" for a super_user.
+8. Optionally, upload a schedule where no event lists `204` and confirm the numbered user sees "Keine Termine für Sie" instead of an error.

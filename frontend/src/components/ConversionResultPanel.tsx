@@ -30,29 +30,38 @@ export function ConversionResultPanel({
   const { t, translateConverterIssue } = useI18n();
   const calendar = result.calendar;
   const showDiagnostics = variant === "full";
+  // A personal calendar with nothing in it is a normal outcome, not a
+  // conversion failure: the schedule simply lists no events for this person.
+  const noPersonalEvents = variant === "download" && result.total_count === 0;
 
-  const titleKey =
-    result.status === "success"
+  const titleKey = noPersonalEvents
+    ? "calendarNoPersonalEventsTitle"
+    : result.status === "success"
       ? "calendarSuccessTitle"
       : result.status === "partial"
         ? "calendarPartialTitle"
         : "calendarFailureTitle";
-  const descriptionKey =
-    result.status === "success"
+  const descriptionKey = noPersonalEvents
+    ? "calendarNoPersonalEventsDescription"
+    : result.status === "success"
       ? "calendarSuccessDescription"
       : result.status === "partial"
         ? "calendarPartialDescription"
         : "calendarFailureDescription";
-  const statusLabelKey =
-    result.status === "success"
+  const statusLabelKey = noPersonalEvents
+    ? "calendarStatusNoEvents"
+    : result.status === "success"
       ? "calendarStatusSuccess"
       : result.status === "partial"
         ? "calendarStatusPartial"
         : "calendarStatusFailure";
+  const panelClassName = noPersonalEvents
+    ? "result-panel no-events-result"
+    : `result-panel ${result.status}-result`;
 
   return (
     <section
-      className={`result-panel ${result.status}-result`}
+      className={panelClassName}
       role="status"
       aria-labelledby="calendar-result-title"
     >
@@ -69,28 +78,30 @@ export function ConversionResultPanel({
           {t("calendarPartialValidOnly")}
         </p>
       ) : null}
-      {result.status === "failure" ? (
+      {result.status === "failure" && !noPersonalEvents ? (
         <p className="result-guidance no-calendar-notice">
           {t("calendarFailureNoCalendar")}
         </p>
       ) : null}
 
-      <dl className="result-counts">
-        <div>
-          <dt>{t("calendarTotalCount")}</dt>
-          <dd>{result.total_count}</dd>
-        </div>
-        <div>
-          <dt>{t("calendarConvertedCount")}</dt>
-          <dd>{result.converted_count}</dd>
-        </div>
-        {showDiagnostics ? (
+      {noPersonalEvents ? null : (
+        <dl className="result-counts">
           <div>
-            <dt>{t("calendarSkippedCount")}</dt>
-            <dd>{result.skipped_count}</dd>
+            <dt>{t("calendarTotalCount")}</dt>
+            <dd>{result.total_count}</dd>
           </div>
-        ) : null}
-      </dl>
+          <div>
+            <dt>{t("calendarConvertedCount")}</dt>
+            <dd>{result.converted_count}</dd>
+          </div>
+          {showDiagnostics ? (
+            <div>
+              <dt>{t("calendarSkippedCount")}</dt>
+              <dd>{result.skipped_count}</dd>
+            </div>
+          ) : null}
+        </dl>
+      )}
 
       {calendar !== null ? (
         <div className="calendar-result">

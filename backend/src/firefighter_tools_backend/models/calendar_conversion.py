@@ -28,7 +28,19 @@ class FatalErrorCode(StrEnum):
     MALFORMED_XLSX = "malformed_xlsx"
     INPUT_READ_ERROR = "input_read_error"
     NO_ACTIVE_SCHEDULE = "no_active_schedule"
+    MISSING_PERSONNEL_NUMBER = "missing_personnel_number"
     INTERNAL_ERROR = "internal_error"
+
+
+class ConversionScope(StrEnum):
+    """Which events a conversion of the active schedule returns.
+
+    ``personal`` keeps the caller's events and the events for everyone;
+    ``full`` returns the whole schedule and is reserved for a super-user.
+    """
+
+    PERSONAL = "personal"
+    FULL = "full"
 
 
 class SourcePosition(ContractModel):

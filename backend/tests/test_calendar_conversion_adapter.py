@@ -188,11 +188,13 @@ def test_calls_library_with_the_stream_and_named_arguments(
         *,
         filename: str,
         calendar_name: str,
+        participant: str | None,
     ) -> EmptyResult:
         captured.update(
             source=passed_source,
             filename=filename,
             calendar_name=calendar_name,
+            participant=participant,
         )
         return EmptyResult()
 
@@ -202,10 +204,12 @@ def test_calls_library_with_the_stream_and_named_arguments(
         source,
         filename="schedule.xlsx",
         calendar_name="Übungen",
+        participant="204",
     )
 
     assert captured == {
         "source": source,
         "filename": "schedule.xlsx",
         "calendar_name": "Übungen",
+        "participant": "204",
     }

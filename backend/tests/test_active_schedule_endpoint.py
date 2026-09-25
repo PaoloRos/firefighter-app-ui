@@ -1,12 +1,13 @@
 """HTTP contract for storing and converting the active schedule."""
 
 import re
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
-from conftest import schedule_csv
+from conftest import SUPER_USER, _client_authenticated_as, schedule_csv
 from firefighter_tools_backend.domain.calendar_conversion import (
     ConversionError,
     ConversionErrorCode,
@@ -23,6 +24,17 @@ PARTIAL_ROWS = (
     "id,summary,all_date,start_date,start_time,end_date,end_time,location,description",
     "valid-1,Atemschutz,false,2026-08-03,19:00,2026-08-03,21:00,Depot,Uebung",
     "invalid-1,,false,2026-08-05,19:00,2026-08-05,21:00,Depot,Ohne Titel",
+)
+PARTICIPANTS_HEADER = (
+    "id,summary,all_date,start_date,start_time,end_date,end_time,"
+    "location,description,participants"
+)
+PARTICIPANT_ROWS = (
+    PARTICIPANTS_HEADER,
+    "chief-only,Kommando,true,2026-08-01,,2026-08-01,,,,101",
+    "member-only,Nachtdienst,true,2026-08-02,,2026-08-02,,,,204",
+    'shared,Einsatzuebung,true,2026-08-03,,2026-08-03,,,,"101;204"',
+    "everyone,Versammlung,true,2026-08-04,,2026-08-04,,,,",
 )
 ALL_INVALID_ROWS = (
     "id,summary,all_date,start_date,start_time,end_date,end_time,location,description",
@@ -194,7 +206,7 @@ def test_plain_user_converts_the_active_schedule(
     payload = response.json()
     assert payload["status"] == "success"
     assert payload["converted_count"] == 1
-    assert payload["calendar"]["filename"] == "dienstplan.ics"
+    assert payload["calendar"]["filename"] == "dienstplan-204.ics"
     assert "BEGIN:VCALENDAR" in payload["calendar"]["ics_text"]
 
 
@@ -343,7 +355,18 @@ def test_openapi_documents_the_stored_schedule_endpoints(
     assert set(schedule["get"]["responses"]) == {"200", "401"}
 
     convert = paths["/api/v1/tools/calendar-converter/schedule/convert"]["post"]
-    assert set(convert["responses"]) == {"200", "401", "409", "415", "422", "500"}
+    assert set(convert["responses"]) == {
+        "200",
+        "401",
+        "403",
+        "409",
+        "415",
+        "422",
+        "500",
+    }
+    scope = {parameter["name"]: parameter for parameter in convert["parameters"]}
+    assert scope["scope"]["in"] == "query"
+    assert scope["scope"]["schema"]["default"] == "personal"
 
 
 def test_stored_timestamp_round_trips_as_utc(
@@ -355,3 +378,139 @@ def test_stored_timestamp_round_trips_as_utc(
 
     assert reread == stored_schedule
     assert str(reread["uploaded_at"]).endswith("Z")
+
+
+def _event_ids(payload: dict[str, object]) -> list[str]:
+    calendar = payload["calendar"]
+    assert isinstance(calendar, dict)
+    return re.findall(r"^UID:(.+?)\r?$", calendar["ics_text"], re.MULTILINE)
+
+
+def test_personal_conversion_keeps_own_shared_and_everyone_events(
+    client: TestClient,
+    user_client: TestClient,
+) -> None:
+    put_schedule(client, body=schedule_csv(PARTICIPANT_ROWS))
+
+    payload = user_client.post(CONVERT_ENDPOINT).json()
+
+    assert payload["status"] == "success"
+    assert payload["total_count"] == 3
+    assert sorted(_event_ids(payload)) == ["everyone", "member-only", "shared"]
+    assert payload["calendar"]["filename"] == "dienstplan-204.ics"
+
+
+def test_explicit_personal_scope_matches_the_default(
+    client: TestClient,
+    user_client: TestClient,
+) -> None:
+    put_schedule(client, body=schedule_csv(PARTICIPANT_ROWS))
+
+    explicit = user_client.post(f"{CONVERT_ENDPOINT}?scope=personal").json()
+
+    assert explicit == user_client.post(CONVERT_ENDPOINT).json()
+
+
+def test_super_user_full_scope_returns_every_event(client: TestClient) -> None:
+    put_schedule(client, body=schedule_csv(PARTICIPANT_ROWS))
+
+    payload = client.post(f"{CONVERT_ENDPOINT}?scope=full").json()
+
+    assert payload["total_count"] == 4
+    assert sorted(_event_ids(payload)) == [
+        "chief-only",
+        "everyone",
+        "member-only",
+        "shared",
+    ]
+    assert payload["calendar"]["filename"] == "dienstplan.ics"
+
+
+def test_super_user_personal_scope_returns_only_their_events(
+    client: TestClient,
+) -> None:
+    put_schedule(client, body=schedule_csv(PARTICIPANT_ROWS))
+
+    payload = client.post(CONVERT_ENDPOINT).json()
+
+    assert sorted(_event_ids(payload)) == ["chief-only", "everyone", "shared"]
+    assert payload["calendar"]["filename"] == "dienstplan-101.ics"
+
+
+def test_plain_user_cannot_request_the_full_schedule(
+    client: TestClient,
+    user_client: TestClient,
+) -> None:
+    put_schedule(client, body=schedule_csv(PARTICIPANT_ROWS))
+
+    response = user_client.post(f"{CONVERT_ENDPOINT}?scope=full")
+
+    assert response.status_code == 403
+    assert response.json()["code"] == "forbidden"
+
+
+def test_personal_conversion_without_a_personnel_number_is_refused(
+    stored_schedule: dict[str, object],
+    unnumbered_client: TestClient,
+) -> None:
+    response = unnumbered_client.post(CONVERT_ENDPOINT)
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "code": "missing_personnel_number",
+        "message": "This account has no personnel number.",
+    }
+
+
+def test_super_user_without_a_number_can_still_convert_the_full_schedule(
+    stored_schedule: dict[str, object],
+) -> None:
+    unnumbered_chief = replace(SUPER_USER, personnel_number=None)
+    for client in _client_authenticated_as(unnumbered_chief):
+        assert client.post(f"{CONVERT_ENDPOINT}?scope=full").status_code == 200
+        personal = client.post(CONVERT_ENDPOINT)
+        assert personal.json()["code"] == "missing_personnel_number"
+
+
+def test_personal_conversion_with_no_matching_events_offers_no_calendar(
+    client: TestClient,
+    user_client: TestClient,
+) -> None:
+    rows = (PARTICIPANTS_HEADER, PARTICIPANT_ROWS[1])
+    put_schedule(client, body=schedule_csv(rows))
+
+    payload = user_client.post(CONVERT_ENDPOINT).json()
+
+    assert payload["status"] == "failure"
+    assert payload["total_count"] == 0
+    assert payload["invalid_events"] == []
+    assert payload["calendar"] is None
+
+
+def test_personal_conversion_hides_other_peoples_invalid_events(
+    client: TestClient,
+    user_client: TestClient,
+) -> None:
+    rows = (
+        PARTICIPANTS_HEADER,
+        "broken,,true,2026-08-01,,2026-08-01,,,,101",
+        "everyone,Versammlung,true,2026-08-04,,2026-08-04,,,,",
+    )
+    put_schedule(client, body=schedule_csv(rows))
+
+    personal = user_client.post(CONVERT_ENDPOINT).json()
+    full = client.post(f"{CONVERT_ENDPOINT}?scope=full").json()
+
+    assert personal["status"] == "success"
+    assert personal["skipped_count"] == 0
+    assert full["status"] == "partial"
+    assert full["invalid_events"][0]["id"] == "broken"
+
+
+def test_rejects_an_unknown_scope(
+    stored_schedule: dict[str, object],
+    client: TestClient,
+) -> None:
+    response = client.post(f"{CONVERT_ENDPOINT}?scope=everything")
+
+    assert response.status_code == 422

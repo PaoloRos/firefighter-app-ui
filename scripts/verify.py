@@ -71,9 +71,9 @@ def main() -> int:
     failures: list[str] = []
 
     converter_version = version("calendar-conversion")
-    if converter_version != "0.2.0":
+    if converter_version != "0.3.0":
         failures.append(
-            "Expected calendar-conversion 0.2.0, found " + converter_version
+            "Expected calendar-conversion 0.3.0, found " + converter_version
         )
 
     direct_url_text = distribution("calendar-conversion").read_text(
@@ -81,9 +81,9 @@ def main() -> int:
     )
     direct_url = json.loads(direct_url_text) if direct_url_text else {}
     vcs_info = direct_url.get("vcs_info", {})
-    if vcs_info.get("requested_revision") != "v0.2.0":
+    if vcs_info.get("requested_revision") != "v0.3.0":
         failures.append(
-            "calendar-conversion is not installed from requested revision v0.2.0"
+            "calendar-conversion is not installed from requested revision v0.3.0"
         )
 
     from firefighter_tools_backend.server import HOST
@@ -124,7 +124,7 @@ def main() -> int:
         return 1
 
     print(f"calendar-conversion: {converter_version}")
-    print("calendar-conversion revision: v0.2.0")
+    print("calendar-conversion revision: v0.3.0")
     print(f"production frontend: {frontend_index.relative_to(ROOT)}")
     print(f"server host: {HOST}")
     print("retained calendar files: none")

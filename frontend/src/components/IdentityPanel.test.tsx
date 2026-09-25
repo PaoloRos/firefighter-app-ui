@@ -6,7 +6,7 @@ import { LANGUAGE_STORAGE_KEY } from "../i18n/I18nProvider";
 import { renderApp, SUPER_USER } from "../test/renderApp";
 
 function userWith(profile: Partial<SessionUser>): SessionUser {
-  return { ...SUPER_USER, ...profile };
+  return { ...SUPER_USER, personnel_number: null, ...profile };
 }
 
 describe("home identity panel", () => {
@@ -80,6 +80,13 @@ describe("home identity panel", () => {
     expect(panel.querySelector(".identity-tags")).toBeNull();
   });
 
+  it("shows the personnel number as a profile tag", () => {
+    renderApp("/", { user: userWith({ personnel_number: "101" }) });
+
+    const panel = screen.getByRole("region", { name: "Wer bist du" });
+    expect(within(panel).getByText("Personalnummer 101")).toBeVisible();
+  });
+
   it("translates the panel into Italian", () => {
     window.localStorage.setItem(LANGUAGE_STORAGE_KEY, "it");
     renderApp("/", { user: userWith({ rank: "KDT", zug: "1", gruppe: "2" }) });
@@ -89,5 +96,13 @@ describe("home identity panel", () => {
     // "Zug" and "Gruppe" stay German in the Italian UI (organisational names).
     expect(within(panel).getByText("Zug 1")).toBeVisible();
     expect(within(panel).getByText("Gruppe 2")).toBeVisible();
+  });
+
+  it("labels the personnel number in Italian", () => {
+    window.localStorage.setItem(LANGUAGE_STORAGE_KEY, "it");
+    renderApp("/", { user: userWith({ personnel_number: "204" }) });
+
+    const panel = screen.getByRole("region", { name: "Chi sei" });
+    expect(within(panel).getByText("Matricola 204")).toBeVisible();
   });
 });

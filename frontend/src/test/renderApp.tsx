@@ -13,6 +13,7 @@ export const SUPER_USER: SessionUser = {
   rank: null,
   zug: null,
   gruppe: null,
+  personnel_number: "101",
 };
 
 export const PLAIN_USER: SessionUser = {
@@ -23,6 +24,15 @@ export const PLAIN_USER: SessionUser = {
   rank: null,
   zug: null,
   gruppe: null,
+  personnel_number: "204",
+};
+
+/** A plain account that has no personnel number assigned yet. */
+export const UNNUMBERED_USER: SessionUser = {
+  ...PLAIN_USER,
+  username: "recruit",
+  name: "Recruit",
+  personnel_number: null,
 };
 
 /**

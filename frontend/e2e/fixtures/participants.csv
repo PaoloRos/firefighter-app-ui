@@ -1,0 +1,5 @@
+id,summary,all_date,start_date,start_time,end_date,end_time,location,description,participants
+chief-only,Kommandositzung,false,2026-08-01,19:00,2026-08-01,21:00,Feuerwehrhaus,,101
+member-only,Nachtdienst,false,2026-08-02,22:00,2026-08-03,07:00,Feuerwehrhaus,,204
+shared,Atemschutzübung,false,2026-08-04,19:00,2026-08-04,21:00,Übungsplatz,,"101;204"
+everyone,Versammlung,true,2026-08-05,,2026-08-05,,Feuerwehrhaus,,

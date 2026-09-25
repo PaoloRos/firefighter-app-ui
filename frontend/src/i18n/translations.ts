@@ -57,6 +57,19 @@ export const germanTranslations = {
   calendarActiveScheduleUploadedBy: "Hochgeladen von",
   calendarActiveScheduleSize: "Größe",
   calendarConvertActive: "Kalender erstellen",
+  calendarHelpPersonal:
+    "Der Kalender enthält Ihre eigenen Termine und die Termine für alle.",
+  calendarHelpParticipants:
+    "Die optionale Spalte „participants“ legt fest, für wen ein Termin gilt: Personalnummern, getrennt durch ; oder , (z. B. 101;204). Eine leere Zelle bedeutet: für alle.",
+  converterScopePersonal: "Nur meine Termine",
+  converterScopeFullHint:
+    "Ohne Häkchen wird der vollständige Dienstplan mit allen Problemen erstellt.",
+  converterScopePersonalUnavailable:
+    "Nicht verfügbar: Ihrem Konto ist keine Personalnummer zugeordnet.",
+  calendarStatusNoEvents: "Keine Termine",
+  calendarNoPersonalEventsTitle: "Keine Termine für Sie",
+  calendarNoPersonalEventsDescription:
+    "Im aktuellen Dienstplan gibt es keine Termine für Sie. Es wurde keine Kalenderdatei erstellt.",
   calendarUploadTitle: "Dienstplan bereitstellen",
   calendarUploadSubmit: "Dienstplan hochladen",
   calendarUploading: "Wird hochgeladen …",
@@ -111,6 +124,8 @@ export const germanTranslations = {
   errorInputRead: "Die hochgeladene Datei konnte nicht gelesen werden.",
   errorNoActiveSchedule:
     "Es ist kein Dienstplan hinterlegt. Bitte wenden Sie sich an einen Super-User.",
+  errorMissingPersonnelNumber:
+    "Ihrem Konto ist keine Personalnummer zugeordnet. Bitte wenden Sie sich an einen Super-User, damit Ihre persönlichen Termine erstellt werden können.",
   errorInternal: "Die Konvertierung ist unerwartet fehlgeschlagen.",
   issueEmptyId: "Die Ereignis-ID fehlt.",
   issueEmptySummary: "Die Zusammenfassung fehlt.",
@@ -140,6 +155,7 @@ export const germanTranslations = {
   identityRankLabel: "Dienstgrad",
   identityZugLabel: "Zug",
   identityGruppeLabel: "Gruppe",
+  identityPersonnelNumberLabel: "Personalnummer",
 } as const;
 
 export type TranslationKey = keyof typeof germanTranslations;
@@ -199,6 +215,19 @@ export const italianTranslations = {
   calendarActiveScheduleUploadedBy: "Caricato da",
   calendarActiveScheduleSize: "Dimensione",
   calendarConvertActive: "Crea il calendario",
+  calendarHelpPersonal:
+    "Il calendario contiene i tuoi impegni e quelli per tutti.",
+  calendarHelpParticipants:
+    "La colonna facoltativa «participants» indica per chi vale un impegno: numeri di matricola separati da ; o , (ad es. 101;204). Una cella vuota significa: per tutti.",
+  converterScopePersonal: "Solo i miei impegni",
+  converterScopeFullHint:
+    "Senza la spunta viene creato il piano dei turni completo con tutti i problemi.",
+  converterScopePersonalUnavailable:
+    "Non disponibile: al tuo account non è assegnato un numero di matricola.",
+  calendarStatusNoEvents: "Nessun impegno",
+  calendarNoPersonalEventsTitle: "Nessun impegno per te",
+  calendarNoPersonalEventsDescription:
+    "Nel piano dei turni attuale non ci sono impegni per te. Non è stato creato alcun file calendario.",
   calendarUploadTitle: "Fornisci il piano dei turni",
   calendarUploadSubmit: "Carica il piano dei turni",
   calendarUploading: "Caricamento in corso …",
@@ -253,6 +282,8 @@ export const italianTranslations = {
   errorInputRead: "Non è stato possibile leggere il file caricato.",
   errorNoActiveSchedule:
     "Nessun piano dei turni disponibile. Rivolgiti a un super-utente.",
+  errorMissingPersonnelNumber:
+    "Al tuo account non è assegnato un numero di matricola. Rivolgiti a un super-utente per ricevere i tuoi impegni personali.",
   errorInternal: "La conversione non è riuscita a causa di un errore imprevisto.",
   issueEmptyId: "Manca l'ID dell'evento.",
   issueEmptySummary: "Manca il riepilogo.",
@@ -282,6 +313,7 @@ export const italianTranslations = {
   identityRankLabel: "Grado",
   identityZugLabel: "Zug",
   identityGruppeLabel: "Gruppe",
+  identityPersonnelNumberLabel: "Matricola",
 } satisfies TranslationDictionary;
 
 export const translations = {
@@ -299,6 +331,7 @@ const apiErrorTranslationKeys = {
   malformed_xlsx: "errorMalformedXlsx",
   input_read_error: "errorInputRead",
   no_active_schedule: "errorNoActiveSchedule",
+  missing_personnel_number: "errorMissingPersonnelNumber",
   internal_error: "errorInternal",
 } satisfies Record<ApiErrorCode, TranslationKey>;
 

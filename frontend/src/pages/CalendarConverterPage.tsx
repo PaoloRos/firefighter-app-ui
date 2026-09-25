@@ -16,6 +16,7 @@ import {
   type ActiveSchedule,
   type ApiErrorCode,
   type ConversionResponse,
+  type ConversionScope,
 } from "../api/calendarConverter";
 
 export const EXAMPLE_SCHEDULE_URL =
@@ -37,11 +38,20 @@ export function CalendarConverterPage() {
   const [conversion, setConversion] = useState<ConversionState>({
     status: "idle",
   });
+  const [personalOnly, setPersonalOnly] = useState(false);
   const outcomeHeadingRef = useRef<HTMLHeadingElement>(null);
 
   const isSuperUser = user?.role === "super_user";
+  const hasPersonnelNumber = Boolean(user?.personnel_number);
+  // A super-user reviews the whole schedule unless they ask for their own
+  // calendar; every other account only ever receives its own events.
+  const scope: ConversionScope =
+    isSuperUser && !personalOnly ? "full" : "personal";
   const isConverting = conversion.status === "converting";
-  const canConvert = schedule.status === "loaded" && !isConverting;
+  const canConvert =
+    schedule.status === "loaded" &&
+    !isConverting &&
+    (scope === "full" || hasPersonnelNumber);
 
   const loadSchedule = useCallback(async (signal?: AbortSignal) => {
     setSchedule({ status: "loading" });
@@ -81,6 +91,12 @@ export function CalendarConverterPage() {
     }
   }, [conversion]);
 
+  function handleScopeChange(nextPersonalOnly: boolean) {
+    setPersonalOnly(nextPersonalOnly);
+    // A result for the other scope would describe a different calendar.
+    setConversion({ status: "idle" });
+  }
+
   function handleUploaded(stored: ActiveSchedule) {
     setSchedule({ status: "loaded", schedule: stored });
     setConversion({ status: "idle" });
@@ -94,7 +110,7 @@ export function CalendarConverterPage() {
     setConversion({ status: "converting" });
 
     try {
-      const converted = await convertActiveSchedule();
+      const converted = await convertActiveSchedule({ scope });
       if (converted.ok) {
         setConversion({ status: "result", result: converted.response });
         return;
@@ -127,6 +143,8 @@ export function CalendarConverterPage() {
           <ul className="help-details">
             {isSuperUser ? <li>{t("calendarHelpFormats")}</li> : null}
             {isSuperUser ? <li>{t("calendarHelpLimit")}</li> : null}
+            <li>{t("calendarHelpPersonal")}</li>
+            {isSuperUser ? <li>{t("calendarHelpParticipants")}</li> : null}
             <li>{t("calendarHelpPartial")}</li>
             <li>{t("calendarHelpPrivacy")}</li>
           </ul>
@@ -149,6 +167,32 @@ export function CalendarConverterPage() {
             onRetry={() => void loadSchedule()}
           />
 
+          {!isSuperUser && !hasPersonnelNumber ? (
+            <p className="result-guidance missing-number-notice">
+              {t("errorMissingPersonnelNumber")}
+            </p>
+          ) : null}
+
+          {isSuperUser ? (
+            <div className="scope-toggle">
+              <label className="scope-toggle-label">
+                <input
+                  type="checkbox"
+                  checked={personalOnly}
+                  disabled={!hasPersonnelNumber || isConverting}
+                  onChange={(event) => handleScopeChange(event.target.checked)}
+                  aria-describedby="scope-toggle-hint"
+                />
+                {t("converterScopePersonal")}
+              </label>
+              <p id="scope-toggle-hint" className="scope-toggle-hint">
+                {hasPersonnelNumber
+                  ? t("converterScopeFullHint")
+                  : t("converterScopePersonalUnavailable")}
+              </p>
+            </div>
+          ) : null}
+
           <div className="convert-actions">
             <button
               className="primary-button"
@@ -169,7 +213,7 @@ export function CalendarConverterPage() {
           {conversion.status === "result" ? (
             <ConversionResultPanel
               result={conversion.result}
-              variant={isSuperUser ? "full" : "download"}
+              variant={scope === "full" ? "full" : "download"}
               headingRef={outcomeHeadingRef}
             />
           ) : null}

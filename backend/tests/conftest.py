@@ -31,8 +31,21 @@ from firefighter_tools_backend.dependencies import get_current_user  # noqa: E40
 from firefighter_tools_backend.domain.user import Role, User  # noqa: E402
 from firefighter_tools_backend.services import schedule_store  # noqa: E402
 
-SUPER_USER = User(id=1, username="chief", role=Role.SUPER_USER, name="Chief")
-PLAIN_USER = User(id=2, username="member", role=Role.USER, name="Member")
+SUPER_USER = User(
+    id=1,
+    username="chief",
+    role=Role.SUPER_USER,
+    name="Chief",
+    personnel_number="101",
+)
+PLAIN_USER = User(
+    id=2,
+    username="member",
+    role=Role.USER,
+    name="Member",
+    personnel_number="204",
+)
+UNNUMBERED_USER = User(id=3, username="recruit", role=Role.USER, name="Recruit")
 
 
 @pytest.fixture(autouse=True)
@@ -102,6 +115,12 @@ def client() -> Generator[TestClient]:
 def user_client() -> Generator[TestClient]:
     """Client whose session resolves to a normal (non-super) user account."""
     yield from _client_authenticated_as(PLAIN_USER)
+
+
+@pytest.fixture
+def unnumbered_client() -> Generator[TestClient]:
+    """Client whose session resolves to a user without a personnel number."""
+    yield from _client_authenticated_as(UNNUMBERED_USER)
 
 
 @pytest.fixture

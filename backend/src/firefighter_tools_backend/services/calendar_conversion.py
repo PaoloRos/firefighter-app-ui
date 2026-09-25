@@ -16,10 +16,16 @@ def convert_calendar(
     source: BinaryIO,
     *,
     filename: str,
+    participant: str | None = None,
 ) -> ConversionResult:
-    """Convert a validated upload through the calendar-conversion adapter."""
+    """Convert a validated upload through the calendar-conversion adapter.
+
+    With ``participant`` set, only that person's events and the events meant
+    for everyone are converted.
+    """
     return convert_schedule(
         source,
         filename=filename,
         calendar_name=CALENDAR_NAME,
+        participant=participant,
     )

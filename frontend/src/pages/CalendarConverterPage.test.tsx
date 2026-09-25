@@ -11,7 +11,12 @@ import {
   type ConversionResponse,
 } from "../api/calendarConverter";
 import { LANGUAGE_STORAGE_KEY } from "../i18n/I18nProvider";
-import { PLAIN_USER, renderApp } from "../test/renderApp";
+import {
+  PLAIN_USER,
+  SUPER_USER,
+  UNNUMBERED_USER,
+  renderApp,
+} from "../test/renderApp";
 import {
   EXAMPLE_SCHEDULE_FILENAME,
   EXAMPLE_SCHEDULE_URL,
@@ -324,5 +329,153 @@ describe("calendar converter page", () => {
     expect(
       screen.getByRole("button", { name: "Crea il calendario" }),
     ).toBeInTheDocument();
+  });
+
+  describe("per-person calendars", () => {
+    const personalToggle = () =>
+      screen.getByRole("checkbox", { name: "Nur meine Termine" });
+
+    it("converts the full schedule for a super-user by default", async () => {
+      renderApp(ROUTE);
+      await screen.findByText("dienstplan.xlsx");
+
+      expect(personalToggle()).not.toBeChecked();
+      await convertAndWait();
+
+      expect(mockedConvert).toHaveBeenCalledWith({ scope: "full" });
+    });
+
+    it("converts a super-user's own events when the toggle is on", async () => {
+      mockedConvert.mockResolvedValue({ ok: true, response: partialResponse() });
+      renderApp(ROUTE);
+      await screen.findByText("dienstplan.xlsx");
+
+      fireEvent.click(personalToggle());
+      await convertAndWait();
+      await screen.findByRole("heading", { name: "Teilweise konvertiert" });
+
+      expect(mockedConvert).toHaveBeenCalledWith({ scope: "personal" });
+      // The personal calendar is a download, not a review of the file.
+      expect(screen.queryByText("invalid-1")).not.toBeInTheDocument();
+    });
+
+    it("clears a shown result when the toggle changes", async () => {
+      renderApp(ROUTE);
+      await screen.findByText("dienstplan.xlsx");
+      await convertAndWait();
+      await screen.findByRole("heading", { name: "Konvertierung erfolgreich" });
+
+      fireEvent.click(personalToggle());
+
+      expect(
+        screen.queryByRole("heading", { name: "Konvertierung erfolgreich" }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("disables the toggle for a super-user without a personnel number", async () => {
+      renderApp(ROUTE, {
+        user: { ...SUPER_USER, personnel_number: null },
+      });
+      await screen.findByText("dienstplan.xlsx");
+
+      expect(personalToggle()).toBeDisabled();
+      expect(
+        screen.getByText(
+          "Nicht verfügbar: Ihrem Konto ist keine Personalnummer zugeordnet.",
+        ),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Kalender erstellen" }),
+      ).toBeEnabled();
+    });
+
+    it("converts a plain user's own events without offering the toggle", async () => {
+      renderApp(ROUTE, { user: PLAIN_USER });
+      await screen.findByText("dienstplan.xlsx");
+
+      expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+      await convertAndWait();
+
+      expect(mockedConvert).toHaveBeenCalledWith({ scope: "personal" });
+    });
+
+    it("blocks a plain user without a personnel number before converting", async () => {
+      renderApp(ROUTE, { user: UNNUMBERED_USER });
+      await screen.findByText("dienstplan.xlsx");
+
+      expect(
+        screen.getByText(/Ihrem Konto ist keine Personalnummer zugeordnet\./),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Kalender erstellen" }),
+      ).toBeDisabled();
+      expect(mockedConvert).not.toHaveBeenCalled();
+    });
+
+    it("translates a missing personnel number reported by the server", async () => {
+      mockedConvert.mockResolvedValue(fatalResult("missing_personnel_number"));
+      renderApp(ROUTE, { user: PLAIN_USER });
+      await screen.findByText("dienstplan.xlsx");
+      await convertAndWait();
+
+      const alert = await screen.findByRole("alert");
+      expect(
+        within(alert).getByText(
+          /Bitte wenden Sie sich an einen Super-User, damit Ihre persönlichen Termine/,
+        ),
+      ).toBeInTheDocument();
+      expect(within(alert).queryByText("unsafe backend detail")).toBeNull();
+    });
+
+    it("tells a plain user when the schedule has no events for them", async () => {
+      mockedConvert.mockResolvedValue({
+        ok: true,
+        response: {
+          status: "failure",
+          total_count: 0,
+          converted_count: 0,
+          skipped_count: 0,
+          invalid_events: [],
+          calendar: null,
+        },
+      });
+      renderApp(ROUTE, { user: PLAIN_USER });
+      await screen.findByText("dienstplan.xlsx");
+      await convertAndWait();
+
+      expect(
+        await screen.findByRole("heading", { name: "Keine Termine für Sie" }),
+      ).toBeInTheDocument();
+    });
+
+    it("explains the participants column only to a super-user", async () => {
+      const participantsHelp = /Die optionale Spalte „participants“/;
+
+      const { unmount } = renderApp(ROUTE);
+      await screen.findByText("dienstplan.xlsx");
+      const superHelp = screen.getByRole("complementary");
+      expect(within(superHelp).getByText(participantsHelp)).toBeInTheDocument();
+      unmount();
+
+      renderApp(ROUTE, { user: PLAIN_USER });
+      await screen.findByText("dienstplan.xlsx");
+      const help = screen.getByRole("complementary");
+      expect(within(help).queryByText(participantsHelp)).toBeNull();
+      expect(
+        within(help).getByText(
+          "Der Kalender enthält Ihre eigenen Termine und die Termine für alle.",
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it("labels the toggle in Italian", async () => {
+      window.localStorage.setItem(LANGUAGE_STORAGE_KEY, "it");
+      renderApp(ROUTE);
+      await screen.findByText("dienstplan.xlsx");
+
+      expect(
+        screen.getByRole("checkbox", { name: "Solo i miei impegni" }),
+      ).toBeInTheDocument();
+    });
   });
 });

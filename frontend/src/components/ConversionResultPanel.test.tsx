@@ -100,4 +100,46 @@ describe("conversion result panel", () => {
       screen.getByText("Es wurde keine Kalenderdatei erstellt."),
     ).toBeInTheDocument();
   });
+
+  it("tells a person with no events in the schedule, without an error tone", () => {
+    const empty: ConversionResponse = {
+      status: "failure",
+      total_count: 0,
+      converted_count: 0,
+      skipped_count: 0,
+      invalid_events: [],
+      calendar: null,
+    };
+    const { container } = renderPanel("download", empty);
+
+    expect(
+      screen.getByRole("heading", { name: "Keine Termine für Sie" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Keine Termine")).toBeInTheDocument();
+    expect(
+      screen.queryByText("Es wurde keine Kalenderdatei erstellt."),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Ereignisse insgesamt")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Kalender herunterladen" }),
+    ).not.toBeInTheDocument();
+    expect(container.querySelector(".no-events-result")).not.toBeNull();
+    expect(container.querySelector(".failure-result")).toBeNull();
+  });
+
+  it("keeps the failure wording for an empty schedule in the full variant", () => {
+    const empty: ConversionResponse = {
+      status: "failure",
+      total_count: 0,
+      converted_count: 0,
+      skipped_count: 0,
+      invalid_events: [],
+      calendar: null,
+    };
+    renderPanel("full", empty);
+
+    expect(
+      screen.getByRole("heading", { name: "Keine Ereignisse konvertiert" }),
+    ).toBeInTheDocument();
+  });
 });

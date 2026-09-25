@@ -17,13 +17,17 @@ queues a task.
 
 ## Commits
 
-Every commit you create must end with a blank line followed by exactly:
+Every commit you create must end with a blank line followed by a co-author
+trailer naming the Claude model that actually did the work in that session:
 
 ```
-Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Co-Authored-By: Claude <Model Name> <noreply@anthropic.com>
 ```
 
-This is the last line of the message, after any body text. Do not add it to
+Use the model's display name as the session reports it (for example
+`Claude Opus 5.5` or `Claude Sonnet 5`), never a hard-coded or guessed one; if the
+model changes mid-session, use the one that produced the commit. This is the last
+line of the message, after any body text. Do not add it to
 commits the user makes without your involvement. Follow the `AGENTS.md` rule that
 GitHub pushes and other remote mutations stay manual — never push, amend published
 history, or touch remotes on your own.

@@ -72,7 +72,7 @@ def test_route_reaches_typed_converter_api_without_cli_or_subprocess() -> None:
     )
 
 
-def test_backend_declares_tagged_v020_api_dependency() -> None:
+def test_backend_declares_tagged_v030_api_dependency() -> None:
     configuration = tomllib.loads(
         (PROJECT_ROOT / "backend" / "pyproject.toml").read_text()
     )
@@ -80,9 +80,9 @@ def test_backend_declares_tagged_v020_api_dependency() -> None:
 
     assert (
         "calendar-conversion @ "
-        "git+https://github.com/PaoloRos/calendar-conversion.git@v0.2.0"
+        "git+https://github.com/PaoloRos/calendar-conversion.git@v0.3.0"
     ) in dependencies
-    assert version("calendar-conversion") == "0.2.0"
+    assert version("calendar-conversion") == "0.3.0"
 
 
 def test_partial_response_ics_contains_only_valid_events(

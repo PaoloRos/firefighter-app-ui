@@ -156,6 +156,7 @@ def test_fatal_error_code_values_are_stable() -> None:
         "malformed_xlsx",
         "input_read_error",
         "no_active_schedule",
+        "missing_personnel_number",
         "internal_error",
     ]
 

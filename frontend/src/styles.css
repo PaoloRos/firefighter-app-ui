@@ -605,6 +605,21 @@ p {
   color: var(--color-warning);
 }
 
+.no-events-result {
+  border-color: var(--color-border-strong);
+  border-left-color: var(--color-text-muted);
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+}
+
+.missing-number-notice {
+  margin: 0;
+  border-color: var(--color-warning-border);
+  border-left-color: var(--color-warning);
+  background: var(--color-warning-surface);
+  color: var(--color-warning);
+}
+
 .failure-result,
 .fatal-result {
   border-color: var(--color-danger-border);
@@ -946,6 +961,38 @@ p {
 
 .active-schedule-filename {
   font-weight: 750;
+}
+
+.scope-toggle {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.scope-toggle-label {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  gap: var(--space-3);
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.scope-toggle-label input {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0;
+  accent-color: var(--color-brand);
+}
+
+.scope-toggle-label:has(input:disabled) {
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+}
+
+.scope-toggle-hint {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
 }
 
 .convert-actions {

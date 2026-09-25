@@ -49,13 +49,19 @@ def convert_schedule(
     *,
     filename: str,
     calendar_name: str,
+    participant: str | None = None,
 ) -> ConversionResult:
-    """Convert an in-memory stream and return only backend-owned types."""
+    """Convert an in-memory stream and return only backend-owned types.
+
+    ``participant`` keeps only that person's events plus the events for
+    everyone; ``None`` converts the full schedule.
+    """
     try:
         result = library_convert_schedule(
             source,
             filename=filename,
             calendar_name=calendar_name,
+            participant=participant,
         )
     except LibraryConversionError as error:
         raise ConversionError(

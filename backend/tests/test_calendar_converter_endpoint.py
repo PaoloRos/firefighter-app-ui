@@ -95,7 +95,11 @@ def test_every_fatal_error_code_is_reachable_from_a_mapping() -> None:
         for _, code, _ in mapping.values()
     }
 
-    assert mapped | {FatalErrorCode.INTERNAL_ERROR} == set(FatalErrorCode)
+    produced_directly = {
+        FatalErrorCode.INTERNAL_ERROR,
+        route._MISSING_PERSONNEL_NUMBER[1],
+    }
+    assert mapped | produced_directly == set(FatalErrorCode)
 
 
 def test_rejects_conversion_without_a_session(
@@ -176,7 +180,7 @@ def test_returns_success_for_valid_xlsx(client: TestClient) -> None:
         payload["total_count"],
         payload["converted_count"],
         payload["skipped_count"],
-    ) == (1, 1, 0)
+    ) == (3, 3, 0)
     assert payload["calendar"]["filename"] == "calendar_schedule_example.ics"
 
 

@@ -37,6 +37,9 @@ export default async function globalSetup(_config: FullConfig): Promise<void> {
         account.role,
         "--name",
         account.username,
+        ...(account.personnelNumber === null
+          ? []
+          : ["--personnel-number", account.personnelNumber]),
         // getpass would read from the terminal when one is attached and ignore
         // the piped input, so the password is passed on stdin explicitly.
         "--password-stdin",

@@ -41,8 +41,16 @@ Two roles exist:
   active schedule every account converts, may download the example schedule
   that shows the required columns, and may do everything a `user` can.
 - `user` — may sign in, see which schedule is loaded, start its conversion,
-  and download the resulting calendar. The example XLSX is not offered,
+  and download their personal calendar. The example XLSX is not offered,
   because a plain account never supplies a source file.
+
+Calendars are personal. A schedule may carry an optional `participants` column
+listing the personnel numbers an event is for, separated by `;` or `,` (for
+example `101;204`); an empty cell means the event is for everyone. Converting
+returns the signed-in account's events plus the events for everyone, so every
+account that converts needs a personnel number (see `--personnel-number`
+below). A `super_user` converts the full schedule by default, to review every
+event and problem, and can tick "Nur meine Termine" for their own calendar.
 
 All account management happens through the `firefighter_tools_backend` module.
 Run the commands from the repository root after `make setup`; the database file
@@ -148,7 +156,7 @@ Run the complete backend, frontend, production-integration, browser end-to-end, 
 make test
 ```
 
-The command builds the production frontend where required, starts and stops the end-to-end server automatically, verifies `calendar-conversion v0.2.0`, checks Python dependencies, confirms the loopback binding, rejects retained `.ics` files, and checks that the schedule store stays under `data/` and holds only opaque `<uuid>.<csv|xlsx>` files.
+The command builds the production frontend where required, starts and stops the end-to-end server automatically, verifies `calendar-conversion v0.3.0`, checks Python dependencies, confirms the loopback binding, rejects retained `.ics` files, and checks that the schedule store stays under `data/` and holds only opaque `<uuid>.<csv|xlsx>` files.
 
 Individual suites are also available:
 
@@ -180,13 +188,13 @@ As a `super_user`:
 
 1. Open the calendar converter from the dashboard.
 2. Select or drop a CSV/XLSX schedule up to 10 MiB, or download the example XLSX schedule. Uploading replaces the active schedule for every account.
-3. Start conversion and review converted and skipped-event counts, including each skipped event and its problems.
+3. Start conversion and review converted and skipped-event counts, including each skipped event and its problems. This converts the full schedule; tick "Nur meine Termine" to convert only your own events and the events for everyone instead.
 4. For a complete or partial result, download the generated ICS calendar. Partial calendars contain only valid events. All-invalid schedules show their problems without offering an empty download.
 
 As a `user`:
 
 1. Open the calendar converter and confirm which schedule is currently loaded.
-2. Start the conversion and download the generated ICS calendar. Uploading, the example XLSX download, and the skipped-event diagnostics are reserved for `super_user` accounts.
+2. Start the conversion and download your personal ICS calendar, named after your personnel number (for example `dienstplan-204.ics`). It holds your events and the events for everyone; when the schedule has none for you, the page says so instead of offering an empty download. Uploading, the example XLSX download, the full schedule, and the skipped-event diagnostics are reserved for `super_user` accounts.
 
 In both cases, switch between German and Italian at any time; an explicit choice is retained locally.
 
@@ -202,6 +210,7 @@ The active schedule is stored on the server until a `super_user` replaces it. Ge
 - If the development proxy fails, confirm that FastAPI is running on `127.0.0.1:8000` and that `FIREFIGHTER_TOOLS_API_TARGET` contains only a loopback HTTP URL.
 - If an end-to-end test fails, inspect `frontend/test-results/` or run `cd frontend && ./node_modules/.bin/playwright show-report`; these ignored diagnostic artifacts can be removed after review.
 - If the converter reports that no schedule is available, sign in as a `super_user` and upload one; the store starts empty on a fresh checkout.
+- If the converter says your account has no personnel number, assign one with `set-personnel-number --username <account> --personnel-number <n>`. Reload the converter page afterwards; no restart or new sign-in is needed.
 - To reset the server-held schedule, stop the application and delete `data/schedules/`. The next read detects the missing file, clears the stale record, and reports an empty store.
 - If setup fails while offline, reconnect for the initial dependency/browser installation. Normal `make run` operation is offline after setup completes.
 

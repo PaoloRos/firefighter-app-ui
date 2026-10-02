@@ -95,7 +95,7 @@ Every commit actually created with Codex assistance must end with a blank line
 and this trailer when the active host exposes the exact session model:
 
 ```text
-AI-Assisted-By: OpenAI Codex (<exact session model>)
+Co-Authored-By: OpenAI Codex (<exact session model>)
 ```
 
 Otherwise use `AI-Assisted-By: OpenAI Codex`. Never infer the model from

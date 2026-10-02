@@ -8,11 +8,6 @@
 .idea/
 .vscode/
 
-# Claude Code: keep CLAUDE.md and .claude/settings.json tracked; ignore local-only state
-.claude/settings.local.json
-.claude/*.local.json
-CLAUDE.local.md
-
 .pnpm-store/
 /node_modules/
 
@@ -48,6 +43,3 @@ data/
 *.db
 *.sqlite3
 list-users.json
-
-# Claude Code worktrees are local checkouts, never tracked
-.claude/worktrees/

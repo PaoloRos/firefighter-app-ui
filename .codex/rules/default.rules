@@ -1,0 +1,104 @@
+# Allow the repository's established local build, run, and verification targets.
+# `make setup` is intentionally excluded because it installs dependencies.
+prefix_rule(
+    pattern = [
+        "make",
+        [
+            "build",
+            "dev",
+            "run",
+            "test",
+            "test-backend",
+            "test-frontend",
+            "test-integration",
+            "test-e2e",
+            "verify",
+        ],
+    ],
+    decision = "allow",
+    justification = "Run the repository's established local development and verification targets",
+    match = ["make test", "make test-backend", "make run"],
+    not_match = ["make", "make setup", "make clean"],
+)
+
+# Allow the backend's test runner and dependency consistency check.
+prefix_rule(
+    pattern = ["backend/.venv/bin/python", "-m", "pytest"],
+    decision = "allow",
+    justification = "Run the repository's backend test suite",
+    match = [
+        "backend/.venv/bin/python -m pytest backend/tests",
+        "backend/.venv/bin/python -m pytest backend/tests/test_auth.py -q",
+    ],
+    not_match = ["python -m pytest backend/tests"],
+)
+
+prefix_rule(
+    pattern = ["backend/.venv/bin/python", "-m", "pip", "check"],
+    decision = "allow",
+    justification = "Check the already-installed backend dependency set",
+    match = ["backend/.venv/bin/python -m pip check"],
+    not_match = ["backend/.venv/bin/python -m pip install -e backend"],
+)
+
+# Allow repository inspection commands that do not change Git state.
+prefix_rule(
+    pattern = ["git", ["status", "log", "diff", "show", "check-ignore"]],
+    decision = "allow",
+    justification = "Inspect the local repository without changing it",
+    match = ["git status --short", "git log -5 --oneline", "git diff --check"],
+    not_match = ["git add AGENTS.md", "git commit -m update"],
+)
+
+prefix_rule(
+    pattern = ["git", "worktree", "list"],
+    decision = "allow",
+    justification = "Inspect registered Git worktrees without changing them",
+    match = ["git worktree list", "git worktree list --porcelain"],
+    not_match = ["git worktree add ../other"],
+)
+
+# Remote synchronization and tag creation remain manual. Use local Git
+# inspection or ask the user to perform the operation instead.
+prefix_rule(
+    pattern = ["git", ["push", "pull", "fetch", "tag"]],
+    decision = "forbidden",
+    justification = "Remote synchronization and tags are user-managed; use read-only local inspection instead",
+    match = ["git push origin main", "git fetch origin", "git tag v1.0.0"],
+    not_match = ["git status", "git log --all --oneline"],
+)
+
+prefix_rule(
+    pattern = [
+        "git",
+        "remote",
+        [
+            "add",
+            "set-url",
+            "set-head",
+            "set-branches",
+            "remove",
+            "rename",
+            "update",
+            "prune",
+        ],
+    ],
+    decision = "forbidden",
+    justification = "Remote configuration is user-managed; use git remote -v for read-only inspection",
+    match = [
+        "git remote add origin https://example.invalid/repo.git",
+        "git remote set-url origin https://example.invalid/repo.git",
+        "git remote set-head origin main",
+        "git remote set-branches origin main",
+        "git remote remove origin",
+    ],
+    not_match = ["git remote -v", "git remote get-url origin"],
+)
+
+prefix_rule(
+    pattern = ["gh"],
+    decision = "forbidden",
+    justification = "GitHub CLI actions are user-managed; use browser or web tooling for read-only inspection",
+    match = ["gh pr view 1", "gh pr create", "gh repo view"],
+    not_match = ["git status", "git log --oneline"],
+)

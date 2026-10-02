@@ -1310,3 +1310,26 @@ This task also absorbed an unrelated change the project owner made to `assets/ex
 6. Sign in as the numbered user. Confirm there is no checkbox and that the home panel shows `Personalnummer 204`. Converting gives 3 events and `calendar_schedule_example-204.ics`.
 7. Sign in as the account without a number and confirm the warning ("Ihrem Konto ist keine Personalnummer zugeordnet …") and the disabled "Kalender erstellen" button. Switch to Italiano and confirm the Italian texts, including "Solo i miei impegni" for a super_user.
 8. Optionally, upload a schedule where no event lists `204` and confirm the numbered user sees "Keine Termine für Sie" instead of an error.
+
+## TASK-047: Migrate repository agent tooling from Claude to Codex
+
+**Ask:** Replace the repository's active Claude Code instructions, skills, settings, and command policies with Codex-native AGENTS.md, .agents/skills, .codex/config.toml, and .codex/rules conventions; preserve historical records; safely relocate the dirty registered Claude worktree without losing its branch or changes; update AI attribution and documentation; and verify Codex instruction, skill, configuration, and rule discovery.
+
+**Answer:** The active repository workflow is now Codex-native without changing application code, APIs, schemas, or `PLAN.md`. `AGENTS.md` is authoritative and references only `$ai-plan`, `$todo-task`, and `$event-plan` under `.agents/skills/`; those skills now use Codex terminology and tool-neutral progress tracking. The tracked Claude instructions, settings, duplicate skills, and root `SKILL.md` are removed from the working tree, and `.gitignore` no longer contains Claude-specific entries. `.codex/config.toml` defines the repository sandbox and approval defaults, while `.codex/rules/default.rules` allows established local verification and read-only Git inspection and forbids Git publication, remote mutation, and every `gh` command. `AI-PLAN.md` records the approved migration and the README accurately records the project's tooling history. The dirty `worktree-tests` worktree was moved with `git worktree move` to `/Users/paolorossi/Develop/firefighter-app-ui-worktrees/tests`; its branch, `M Makefile` plus untracked `.agents/` status, and binary diff SHA-256 `86fcb00bb4e773459f4e89a748915c784a09db29ad6169e141e12e5581a2d20f` were unchanged. Codex prompt inspection discovered `AGENTS.md` and all three repository skills at their new paths. Strict configuration diagnostics reported `config loaded`; the command itself exited non-zero only for pre-existing desktop CDN reachability and WebSocket/MCP health warnings, not a repository configuration error. No commit or GitHub mutation was made.
+
+**Automated test:**
+
+1. Run `git worktree list --porcelain` and confirm it lists `/Users/paolorossi/Develop/firefighter-app-ui-worktrees/tests` on `refs/heads/worktree-tests` and contains no `.claude` worktree path.
+2. Run `git -C /Users/paolorossi/Develop/firefighter-app-ui-worktrees/tests status --short --branch` and confirm the branch is `worktree-tests` with `M Makefile` and `?? .agents/`. Run `git -C /Users/paolorossi/Develop/firefighter-app-ui-worktrees/tests diff --binary | shasum -a 256` and confirm `86fcb00bb4e773459f4e89a748915c784a09db29ad6169e141e12e5581a2d20f`.
+3. Run `codex debug prompt-input` from the repository and confirm the output includes the root `AGENTS.md`, the repository skill root `.agents/skills`, and the `$ai-plan`, `$todo-task`, and `$event-plan` skill paths, with no repository `.claude` skill path.
+4. Run `codex execpolicy check --pretty --rules .codex/rules/default.rules -- make test` and confirm the decision is `allow`. Repeat with `make setup` and confirm `matchedRules` is empty; repeat with `git push origin main` and `gh pr view 1` and confirm each decision is `forbidden`.
+5. Run `test ! -e .claude && test ! -e CLAUDE.md && test ! -e SKILL.md` and confirm it exits successfully. Until these changes are committed, `git ls-files --deleted .claude CLAUDE.md SKILL.md` intentionally lists the tracked removals because `git ls-files` reads the current index.
+6. Run `git diff --check` and confirm that it produces no output.
+7. Run `make verify` and confirm the frontend production build succeeds, `pip check` reports no broken requirements, and repository verification reports calendar-conversion `0.3.0` at revision `v0.3.0`, production frontend assets, host `127.0.0.1`, no retained calendars, and the configured schedule store.
+
+**Developer demo:**
+
+1. Start a fresh Codex session in the repository and open `/skills`. Confirm `$ai-plan`, `$todo-task`, and `$event-plan` are available from `.agents/skills/`.
+2. Ask Codex to summarize its repository instructions and confirm it reports `AGENTS.md` as authoritative, requires confirmation before a local commit, and refuses automatic GitHub publication.
+3. Inspect `.codex/config.toml` and `.codex/rules/default.rules`, then run the four policy checks from the automated test to see the allowed, unmatched, and forbidden outcomes.
+4. Inspect `git status --short` and confirm the migration is left uncommitted for developer review and contains no application-source or `PLAN.md` change.

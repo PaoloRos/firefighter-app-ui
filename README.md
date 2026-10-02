@@ -218,4 +218,4 @@ The active schedule is stored on the server until a `super_user` replaces it. Ge
 
 Author: [Paolo Rossi](https://github.com/PaoloRos).
 
-This project was developed with AI assistance: initially with [OpenAI Codex](https://openai.com/codex/) (GPT-5.6), and from September 2026 with [Claude Code](https://claude.com/claude-code) (Claude Sonnet 5).
+This project was developed with AI assistance: initially with [OpenAI Codex](https://openai.com/codex/) (GPT-5.6), with [Claude Code](https://claude.com/claude-code) (Claude Sonnet 5) from September 2026, and with a Codex-native repository workflow again from October 2026.

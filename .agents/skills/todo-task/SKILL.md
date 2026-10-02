@@ -1,12 +1,8 @@
 ---
 name: todo-task
 description: >-
-  Use when the user has confirmed a new implementation task to add to TODO.md and
-  wants work to start on it. Appends a sequentially numbered TASK entry with the
-  user's verbatim Ask to the TODO.md queue, implements it end to end per
-  AGENTS.md, then records the finished task (Ask, Answer, Automated test,
-  Developer demo) in IMPLEMENTATION.md and removes it from TODO.md. Triggers:
-  "add a task", "new TODO task", "create TASK-0NN and start", "log this and do it".
+  Queue a user-confirmed implementation task in TODO.md, implement and verify it,
+  then archive its completed record in IMPLEMENTATION.md.
 ---
 
 # Add a TODO.md task and run it
@@ -41,8 +37,8 @@ the permanent history of completed tasks and holds the running task counter.
 
 - Follow `AGENTS.md` for structure, coding style, testing, commit, and security
   rules.
-- Track progress with the TodoWrite tool: draft the steps, keep one
-  `in_progress`, tick items off as they land.
+- For non-trivial work, keep a concise progress plan using the planning facility
+  available in the current Codex host and update it as steps land.
 - Keep working the task through to verification — do not stop at a partial
   implementation.
 

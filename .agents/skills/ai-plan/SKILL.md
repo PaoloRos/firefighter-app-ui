@@ -1,13 +1,8 @@
 ---
 name: ai-plan
 description: >-
-  Use when the user asks for a plan, design, or approach for the work described
-  in TODO.md — before any implementation. Reads the TODO.md brief, asks the
-  clarifying questions needed to make it decision-complete, and writes the
-  finished plan to AI-PLAN.md, replacing whatever that file held. Planning only:
-  it never edits code, never queues a TASK entry, and never starts
-  implementation. Triggers: "make a plan", "plan this", "plan the TODO",
-  "how would you implement TODO.md", "design this before we build it".
+  Create a decision-complete implementation plan from the brief in TODO.md,
+  without queuing or implementing the work.
 ---
 
 # Plan the TODO.md work into AI-PLAN.md
@@ -21,11 +16,13 @@ Boundaries, every time:
 - **Plan only.** Do not edit source files, do not add a `TASK-0NN` entry to
   `TODO.md`, do not start implementing. `AI-PLAN.md` is the only file this skill
   writes.
-- **One plan per file.** `AI-PLAN.md` always holds exactly the current plan.
-  Overwrite the previous contents; git history preserves them
-  (`git log -p AI-PLAN.md`).
+- **One plan per file.** Outside a non-mutating Plan mode, `AI-PLAN.md` always
+  holds exactly the current plan. Overwrite the previous contents; git history
+  preserves them (`git log -p AI-PLAN.md`). In a non-mutating Plan mode, return
+  the finished plan in a `<proposed_plan>` block and leave `AI-PLAN.md`
+  unchanged.
 - Per `AGENTS.md`, agents never create tasks or rewrite asks. The plan *proposes*
-  asks; the user confirms them and then runs `/todo-task`.
+  asks; the user confirms them and then invokes `$todo-task`.
 
 ## 1. Read the inputs
 
@@ -54,10 +51,11 @@ leaves one group with no usable feature, churn across existing tests, a
 contradiction with `PLAN.md`. Say it plainly in the plan and flag it for
 confirmation.
 
-## 3. Write AI-PLAN.md
+## 3. Produce the plan
 
-Replace the file's entire contents with the new plan. Use this shape, dropping
-sections that genuinely do not apply:
+When edits are permitted, replace `AI-PLAN.md` with the new plan. In a
+non-mutating Plan mode, return the same content inside `<proposed_plan>` tags
+instead. Use this shape, dropping sections that genuinely do not apply:
 
 ```markdown
 # <Short descriptive plan title>
@@ -114,10 +112,10 @@ or generated calendars committed.
 
 Report in chat:
 
-- the plan title and that it is in `AI-PLAN.md`,
+- the plan title and whether it was stored in `AI-PLAN.md` or returned in chat,
 - a short summary of the approach,
 - the tasks it proposes and their identifiers,
 - any open question still needing the user's answer.
 
-Then stop. If the user approves, the next step is the `/todo-task` skill, which
+Then stop. If the user approves, the next step is the `$todo-task` skill, which
 queues the confirmed ask and implements it.

@@ -1,26 +1,54 @@
 # Repository Guidelines
 
-## Project Structure & Module Organization
+Explicit user instructions take precedence over workflow-skill guidance when
+they conflict.
 
-`PLAN.md` is the architectural source of truth; update it when boundaries, APIs, or delivery phases change. Use `frontend/` for React and TypeScript, `backend/` for FastAPI, an assets directory for samples, and subsystem test directories. Separate UI, translations, and API clients; keep backend routes, models, adapters, and services distinct.
+## Project structure and sources of truth
 
-## Task Queue in TODO.md and History in IMPLEMENTATION.md
+`PLAN.md` is the architectural source of truth. Update it when system
+boundaries, public APIs, or delivery phases change. Use `frontend/` for React
+and TypeScript, `backend/` for FastAPI, `assets/` for samples, and subsystem
+test directories. Keep frontend UI, translations, and API clients separate;
+keep backend routes, models, adapters, and services distinct.
 
-The user launches project implementation tasks in `TODO.md` by writing the identifier, title, and `Ask`. `TODO.md` is the queue of pending or in-progress tasks; `IMPLEMENTATION.md` is the permanent record of completed tasks. Agents must not create tasks, rewrite asks, or infer work items. Keep identifiers sequential (`TASK-001`, `TASK-002`, and so on) without reuse or renumbering; the highest identifier in `IMPLEMENTATION.md` is the running counter. Before implementation, confirm the entry exists in `TODO.md`. After verification, add its brief `Answer`, then move the completed entry out of `TODO.md` and append the full record to `IMPLEMENTATION.md`.
+## Task queue and repository skills
 
-Starting with `TASK-004`, every completed task must also include two sections immediately after the answer:
+`TODO.md` is the queue of pending or in-progress implementation tasks;
+`IMPLEMENTATION.md` is the permanent history. The user supplies each task's
+identifier, title, and verbatim `Ask`. Identifiers are sequential and are never
+reused or renumbered; the highest identifier in `IMPLEMENTATION.md` is the
+running counter. Before implementation, confirm the entry exists in `TODO.md`.
+After verification, append the full record to `IMPLEMENTATION.md` and remove it
+from `TODO.md`.
 
-- `Automated test` gives the developer copy-pasteable commands and the expected successful result. Include all tests relevant to the task.
-- `Developer demo` gives the local startup commands, URLs or interactions, and the visible behavior the developer should verify manually. For backend-only work, a browser-visible endpoint or API documentation walkthrough is an acceptable visual demo.
+Starting with `TASK-004`, every completed record must place these sections
+after `Answer`: `Automated test` with commands actually run and their expected
+successful result, and `Developer demo` with local commands, URLs or
+interactions, and visible behavior. Backend-only work may use an API endpoint
+or API documentation walkthrough.
 
-Use this format:
+Use the repository skills when their descriptions match:
+
+- `$ai-plan` (`.agents/skills/ai-plan/SKILL.md`) plans a brief from `TODO.md`
+  without starting implementation.
+- `$todo-task` (`.agents/skills/todo-task/SKILL.md`) queues a confirmed task,
+  implements it end to end, verifies it, and archives its record.
+- `$event-plan` (`.agents/skills/event-plan/SKILL.md`) creates or updates the
+  event-plan workbook from `event-guideline.md` and its named sources.
+
+For non-trivial implementation, keep a concise progress plan using the planning
+facility available in the current Codex host. Agents must not invent tasks or
+rewrite asks. User instructions may explicitly exempt agent-behavior or
+documentation maintenance from this process.
+
+Use this completed-task format:
 
 ```markdown
-## TASK-004: Short descriptive title
+## TASK-0NN: Short descriptive title
 
-**Ask:** Brief user-written summary of what is requested.
+**Ask:** Verbatim user-written request.
 
-**Answer:** Brief agent-written summary of what was implemented, including verification.
+**Answer:** Factual implementation and verification summary.
 
 **Automated test:**
 
@@ -30,33 +58,60 @@ Use this format:
 **Developer demo:**
 
 1. Start the application locally with `command`.
-2. Open the documented local URL and confirm the expected visible behavior.
+2. Open the documented URL and confirm the expected behavior.
 ```
 
-Keep answers and test/demo instructions factual and synchronized with delivered work. Do not record commands that were not verified. If an implementation task is missing, ask the user to add it to `TODO.md`. User instructions may explicitly exempt agent-behavior or documentation maintenance from this process.
-
-Finally, **when confirmed by the user**, insert a new task into `TODO.md` depending on the prompted instructions, by respecting the previous rules about the tasks, and then start to work on it, tracking progress with the TodoWrite tool. On completion, record the finished task in `IMPLEMENTATION.md` and remove it from `TODO.md`. Use the `/todo-task` skill (`.claude/skills/todo-task/SKILL.md`) for this repetitive flow.
-## Build, Test, and Development Commands
-
-The shared command contract is introduced as the application is scaffolded:
+## Build, test, and development commands
 
 - `make setup` installs Python and Node dependencies.
 - `make dev` runs Vite and FastAPI for development.
-- `make test` runs the backend, frontend, production-integration, Playwright end-to-end, and invariant verification suites.
-- `make run` builds the frontend and serves the complete application through FastAPI on `127.0.0.1`.
+- `make test` runs backend, frontend, production-integration, Playwright
+  end-to-end, and invariant verification suites.
+- `make run` builds the frontend and serves the application on `127.0.0.1`.
 
-## Coding Style & Testing Guidelines
+Use pytest for FastAPI, Vitest with React Testing Library for components, and
+Playwright end to end. Name tests after behavior and cover every changed
+behavior.
 
-Use four-space indentation, type annotations, `snake_case` functions/modules, and `PascalCase` classes in Python. Use two-space indentation, strict typing, `PascalCase` React components, and `camelCase` functions in TypeScript. Keep API routes under `/api/v1/`; place visible text in German and Italian translation dictionaries.
+## Coding style
 
-Use pytest for FastAPI, Vitest with React Testing Library for components, and Playwright end to end. Name tests after behavior, such as `test_rejects_oversized_upload`, and cover every changed behavior.
+Use four-space indentation, type annotations, `snake_case` functions/modules,
+and `PascalCase` classes in Python. Use two-space indentation, strict typing,
+`PascalCase` React components, and `camelCase` functions in TypeScript. Keep API
+routes under `/api/v1/`; place visible text in German and Italian translation
+dictionaries.
 
-## Commits, Pull Requests & Security
+## Git, publication, and attribution
 
-Use short imperative commit subjects, for example `Add calendar upload validation`. Pull requests should explain behavior, include test evidence, link applicable issues, mention plan or API changes, and show screenshots for UI updates.
+Use short imperative commit subjects. Before creating a local commit, ask
+whether the user wants Codex to create it or will do it personally. Do not pull
+from or publish to GitHub automatically: never create or update remotes, pull or
+push branches or tags, modify pull requests, or create releases. Read-only
+inspection is allowed. Pull requests prepared for the user should explain the
+behavior, include test evidence, link applicable issues, mention plan or API
+changes, and show screenshots for UI updates.
 
-Do not pull from or publish to GitHub automatically. Never create or update remotes, pull or push branches or tags, modify pull requests, or create releases. Leave work local for review. If publication is necessary, pause before any GitHub mutation, explain why, and let the user publish manually. Read-only inspection is allowed.
+Every commit actually created with Codex assistance must end with a blank line
+and this trailer when the active host exposes the exact session model:
 
-Enforce the 10 MiB upload limit, sanitize filenames, and bind locally to `127.0.0.1`. The only retained upload is the single active schedule in the configured store (`data/schedules/` by default, overridable with `FIREFIGHTER_TOOLS_SCHEDULE_STORE`), which is git-ignored and sits outside the served tree; stored files carry opaque `<uuid>.<csv|xlsx>` names, never the uploaded filename. Retain no generated calendar and never write an `.ics` to disk. Never log schedule contents or commit secrets, generated calendars, stored schedules, or local environment files.
+```text
+AI-Assisted-By: OpenAI Codex (<exact session model>)
+```
 
-Store account passwords only as `hashlib.scrypt` hashes and never log them. Read the session secret from `FIREFIGHTER_TOOLS_SECRET_KEY`; the built-in default is for local development only. The SQLite user database (`data/`, `*.db`) and `.env` files are git-ignored and must never be committed.
+Otherwise use `AI-Assisted-By: OpenAI Codex`. Never infer the model from
+`~/.codex/config.toml`, add the trailer to a user-created commit, or rewrite
+existing history merely to change attribution.
+
+## Security
+
+Enforce the 10 MiB upload limit, sanitize filenames, and bind locally to
+`127.0.0.1`. The only retained upload is the single active schedule in the
+configured store (`data/schedules/` by default, overridable with
+`FIREFIGHTER_TOOLS_SCHEDULE_STORE`), which is git-ignored and outside the served
+tree. Stored files use opaque `<uuid>.<csv|xlsx>` names. Never retain generated
+calendars, write an `.ics` to disk, log schedule contents, or commit secrets,
+stored schedules, local databases, or environment files.
+
+Store passwords only as `hashlib.scrypt` hashes. Read the session secret from
+`FIREFIGHTER_TOOLS_SECRET_KEY`; the built-in default is for local development
+only. `data/`, `*.db`, and `.env` files remain git-ignored.

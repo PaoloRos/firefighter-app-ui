@@ -1,12 +1,9 @@
 ---
 name: event-plan
 description: >-
-  Use when the user asks to create, regenerate, or update the event plan — the
-  XLSX schedule of shifts and events built from the printed Taschenkalender and
-  the member list. Follows event-guideline.md, writes the .xlsx the calendar
-  converter accepts, and verifies it with the converter itself. Triggers:
-  "create the event plan", "make the schedule from the Taschenkalender",
-  "regenerate the event plan", "/event-plan".
+  Create, regenerate, or update the event-plan XLSX from the printed
+  Taschenkalender and member list, following event-guideline.md and verifying
+  the result with the calendar converter.
 ---
 
 # Create the event plan
